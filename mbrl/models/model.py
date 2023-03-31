@@ -66,6 +66,9 @@ class Model(nn.Module, abc.ABC):
             None if batch.dones is None else _convert(batch.dones),
         )
 
+    #NOTE: forward call will be changed: 
+    # 1. forward pass given physics
+    # 2. once we get physics make probabilistic method call
     def forward(self, x: torch.Tensor, *args, **kwargs) -> Tuple[torch.Tensor, ...]:
         """Computes the output of the dynamics model.
 
@@ -74,6 +77,7 @@ class Model(nn.Module, abc.ABC):
 
         Returns:
             (tuple of tensors): all tensors predicted by the model (e.g., .mean and logvar).
+            
         """
         pass
 
@@ -421,7 +425,9 @@ class Ensemble(Model, abc.ABC):
         raise NotImplementedError(
             "ModelEnv requires 1-D models must be wrapped into a OneDTransitionRewardModel."
         )
+    
 
+    #NOTE: IMPORTANT METHOD TO BE CHANGE
     def sample_1d(
         self,
         model_input: torch.Tensor,
@@ -453,7 +459,11 @@ class Ensemble(Model, abc.ABC):
             (tuple): predicted observation, rewards, terminal indicator and model
                 state dictionary. Everything but the observation is optional, and can
                 be returned with value ``None``.
+
+        NOTE: this is where we make the forward pass of our dynamics model. Say that we 
         """
+
+        #
         if deterministic or self.deterministic:
             return (
                 self.forward(
@@ -464,6 +474,8 @@ class Ensemble(Model, abc.ABC):
                 model_state,
             )
         assert rng is not None
+
+        #probabilistic return
         means, logvars = self.forward(
             model_input, rng=rng, propagation_indices=model_state["propagation_indices"]
         )

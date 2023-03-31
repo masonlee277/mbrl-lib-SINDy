@@ -40,6 +40,8 @@ class OneDTransitionRewardModel(Model):
 
         [pred_obs_{t+1}, pred_rewards_{t+1} (optional)] = model([obs_t, action_t]).
 
+    NOTE: class:mbrl.models.ModelEnv DOES NOT use sample_1d. our physics model will be defined manually?
+          the wrapped model --- modrl.model.Model must have this!!!!!
     To use with :class:mbrl.models.ModelEnv`, the wrapped model must define methods
     ``reset_1d`` and ``sample_1d``.
 
@@ -275,17 +277,27 @@ class OneDTransitionRewardModel(Model):
             raise RuntimeError(
                 "OneDTransitionRewardModel requires wrapped model to define method sample_1d"
             )
+        
+        #********** IMPORTANT: self.model.sample_1d is where we need to incorporate the physics
         preds, next_model_state = self.model.sample_1d(
             model_in, model_state, rng=rng, deterministic=deterministic
         )
         next_observs = preds[:, :-1] if self.learned_rewards else preds
+
+        #If the certain features are not the differences
         if self.target_is_delta:
             tmp_ = next_observs + obs
             for dim in self.no_delta_list:
                 tmp_[:, dim] = next_observs[:, dim]
             next_observs = tmp_
-        rewards = preds[:, -1:] if self.learned_rewards else None
+
+        #(batch_size, n), where n is the number of dimensions in the output (next_observation + reward)
+        #learning the rewards (i.e. value function approximation --> E[cum reward | state])
+        
+        rewards = preds[:, -1:] if self.learned_rewards else None #optional
         next_model_state["obs"] = next_observs
+
+        #next_observs: predicted next observations (explicity bc easier to access)
         return next_observs, rewards, None, next_model_state
 
     def reset(

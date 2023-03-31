@@ -14,7 +14,9 @@ from . import Model
 
 
 class ModelEnv:
-    """Wraps a dynamics model into a gym-like environment.
+    """
+    
+    Wraps a dynamics model into a gym-like environment.
 
     This class can wrap a dynamics model to be used as an environment. The only requirement
     to use this class is for the model to use this wrapper is to have a method called
@@ -106,6 +108,9 @@ class ModelEnv:
             The done flag is computed using the termination_fn passed in the constructor.
         """
         assert len(actions.shape) == 2  # batch, action_dim
+
+
+        #Here we sample the next actions from the dynamics model
         with torch.no_grad():
             # if actions is tensor, code assumes it's already on self.device
             if isinstance(actions, np.ndarray):
@@ -124,7 +129,7 @@ class ModelEnv:
             rewards = (
                 pred_rewards
                 if self.reward_fn is None
-                else self.reward_fn(actions, next_observs)
+                else self.reward_fn(actions, next_observs) #optional interal reward prediction versus explicity reward function
             )
             dones = self.termination_fn(actions, next_observs)
 
@@ -132,11 +137,16 @@ class ModelEnv:
                 raise NotImplementedError(
                     "ModelEnv doesn't yet support simulating terminal indicators."
                 )
-
+            
+            
             if self._return_as_np:
                 next_observs = next_observs.cpu().numpy()
                 rewards = rewards.cpu().numpy()
                 dones = dones.cpu().numpy()
+            
+            #sample from the dynamics model --> get next state, reward, check if we are done
+            #next_observe: (B, obs_dim) --> obvserations in the enviroment when sampling
+            #next_model_state:  dictionary holind internal state of model after taking a step. such as hidden states in a recurrent neural network.
             return next_observs, rewards, dones, next_model_state
 
     def render(self, mode="human"):

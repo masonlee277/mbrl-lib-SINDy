@@ -17,8 +17,10 @@ from .model import Ensemble
 from .util import EnsembleLinearLayer, truncated_normal_init
 
 
+#NOTE: Basically a better version of the basic_ensemble class (still an ensemble of MLPs)
 class GaussianMLP(Ensemble):
-    """Implements an ensemble of multi-layer perceptrons each modeling a Gaussian distribution.
+    """
+    Implements an ensemble of multi-layer perceptrons each modeling a Gaussian distribution.
 
     This model corresponds to a Probabilistic Ensemble in the Chua et al.,
     NeurIPS 2018 paper (PETS) https://arxiv.org/pdf/1805.12114.pdf
@@ -78,6 +80,8 @@ class GaussianMLP(Ensemble):
         propagation_method: Optional[str] = None,
         learn_logvar_bounds: bool = False,
         activation_fn_cfg: Optional[Union[Dict, omegaconf.DictConfig]] = None,
+        #physics_dim: (for SINDy model)
+        #SINDy model: 
     ):
         super().__init__(
             ensemble_size, device, propagation_method, deterministic=deterministic
@@ -115,7 +119,7 @@ class GaussianMLP(Ensemble):
         else:
             self.mean_and_logvar = create_linear_layer(hid_size, 2 * out_size)
             self.min_logvar = nn.Parameter(
-                -10 * torch.ones(1, out_size), requires_grad=learn_logvar_bounds
+                -10 * torch.ones(1, out_size), requires_grad=learn_logvar_bounds #learning the bounds
             )
             self.max_logvar = nn.Parameter(
                 0.5 * torch.ones(1, out_size), requires_grad=learn_logvar_bounds
@@ -147,8 +151,14 @@ class GaussianMLP(Ensemble):
         if self.deterministic:
             return mean_and_logvar, None
         else:
+            #predictions from ensemble are concatonated so we take each half
             mean = mean_and_logvar[..., : self.out_size]
             logvar = mean_and_logvar[..., self.out_size :]
+
+            #constraitns to log-variancce (range upper and lower bbound)
+            #softplus creates a smooth transition between original value and constrained value
+            #takes real number as input and returns another real number been 0--inf
+            #during training if the model preedicts logvar outside these bounds we want smooth transition
             logvar = self.max_logvar - F.softplus(self.max_logvar - logvar)
             logvar = self.min_logvar + F.softplus(logvar - self.min_logvar)
             return mean, logvar
@@ -161,6 +171,7 @@ class GaussianMLP(Ensemble):
         num_models = (
             len(self.elite_models) if self.elite_models is not None else len(self)
         )
+        #x --> (batch_size, num_models, input_size)
         shuffled_x = x[:, model_shuffle_indices, ...].view(
             num_models, batch_size // num_models, -1
         )
@@ -182,6 +193,8 @@ class GaussianMLP(Ensemble):
         rng: Optional[torch.Generator] = None,
         propagation_indices: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        
+
         if self.propagation_method is None:
             mean, logvar = self._default_forward(x, only_elite=False)
             if self.num_members == 1:
@@ -272,8 +285,35 @@ class GaussianMLP(Ensemble):
             with equal probability), resulting in a smaller batch size which we use for the forward
             pass. If this is a concern, consider using ``propagation=None``, and passing
             the output to :func:`mbrl.util.math.propagate`.
+        
+        NOTE: INCORPORATING THE SINDY PREDICTIONS:
+            1. make a prediction for the state
+            2. concatonate with origonal state
+            3. make the ensemble forward passes as normal
+                we will assume that passing (cur_obs, pred_phys_obs) to the guassianMLP will 
+                give the model enough additional information to make the nessecary precictions
+
+        WATCH OUT FOR:
+            1. the shapes of the input state (the state size may be constrained)
+            2. the hard-part will be training the SINDy model concurrently with the GaussianMLP
+                we will need to create wrappers that handle these dual loss functions within the
+                gym enviroment (making the steps will be a bit difficult because the configs handle one model)
+
+                I think  the best approach will be to build all of this into one class sindy+guassian_MLP
+                bc the gmlp can already handle the training of multiple ensemble memebers, we will just
+                create seperate field for sindy and make the training call at the same time, but the 
+                updates will prob be much less infrequent as we may need more trajectories for good updates
+                and it may not be computationally reasonable to make updates each step
 
         """
+
+        # # Call the physics_prediction function and get the output tensor
+        # physics_output = physics_prediction(x, self.physics_dim)
+
+        # # Concatenate the physics output with the input tensor along dimension 1
+        # x = torch.cat((x, physics_output), dim=1)
+
+
         if use_propagation:
             return self._forward_ensemble(
                 x, rng=rng, propagation_indices=propagation_indices

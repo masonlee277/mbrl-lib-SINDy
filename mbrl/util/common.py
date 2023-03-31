@@ -92,6 +92,9 @@ def create_one_dim_tr_model(
         obs_process_fn = hydra.utils.get_method(cfg.overrides.obs_process_fn)
     else:
         obs_process_fn = None
+
+
+    #this is where the dynamics model is created
     dynamics_model = mbrl.models.OneDTransitionRewardModel(
         model,
         target_is_delta=cfg.algorithm.target_is_delta,
