@@ -161,6 +161,8 @@ class GaussianMLP(Ensemble):
             #during training if the model preedicts logvar outside these bounds we want smooth transition
             logvar = self.max_logvar - F.softplus(self.max_logvar - logvar)
             logvar = self.min_logvar + F.softplus(logvar - self.min_logvar)
+
+            #We need to modify the mean vector with the output from phys_func function
             return mean, logvar
 
     def _forward_from_indices(
