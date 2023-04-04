@@ -66,6 +66,8 @@ class PhysicsGaussianMLP(Ensemble):
             they will be constant. Defaults to ``False``.
         activation_fn_cfg (dict or omegaconf.DictConfig, optional): configuration of the
             desired activation function. Defaults to torch.nn.ReLU when ``None``.
+
+
     """
 
     def __init__(
