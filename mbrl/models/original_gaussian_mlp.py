@@ -10,7 +10,7 @@ import omegaconf
 import torch
 from torch import nn as nn
 from torch.nn import functional as F
-import math
+
 import mbrl.util.math
 
 from .model import Ensemble
@@ -18,7 +18,7 @@ from .util import EnsembleLinearLayer, truncated_normal_init
 
 
 #NOTE: Basically a better version of the basic_ensemble class (still an ensemble of MLPs)
-class PhysicsGaussianMLP(Ensemble):
+class GaussianMLP(Ensemble):
     """
     Implements an ensemble of multi-layer perceptrons each modeling a Gaussian distribution.
 
@@ -66,8 +66,6 @@ class PhysicsGaussianMLP(Ensemble):
             they will be constant. Defaults to ``False``.
         activation_fn_cfg (dict or omegaconf.DictConfig, optional): configuration of the
             desired activation function. Defaults to torch.nn.ReLU when ``None``.
-
-
     """
 
     def __init__(
@@ -91,71 +89,6 @@ class PhysicsGaussianMLP(Ensemble):
 
         self.in_size = in_size
         self.out_size = out_size
-
-        def step_cartpole(env, state, action):
-            '''
-            ornly going to work for cartpole environment
-            TODO: modify to get the all cartpole variables from the gym enviroment
-            '''
-
-
-
-            x, x_dot, theta, theta_dot = self.state[:-1]
-            force = self.force_mag if action == 1 else -self.force_mag
-            costheta = math.cos(theta)
-            sintheta = math.sin(theta)
-
-            # For the interested reader:
-            # https://coneural.org/florian/papers/05_cart_pole.pdf
-            temp = (
-                force + self.polemass_length * theta_dot ** 2 * sintheta
-            ) / self.total_mass
-            thetaacc = (self.gravity * sintheta - costheta * temp) / (
-                self.length * (4.0 / 3.0 - self.masspole * costheta ** 2 / self.total_mass)
-            )
-            xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
-
-            if self.kinematics_integrator == "euler":
-                x = x + self.tau * x_dot
-                x_dot = x_dot + self.tau * xacc
-                theta = theta + self.tau * theta_dot
-                theta_dot = theta_dot + self.tau * thetaacc
-            else:  # semi-implicit euler
-                x_dot = x_dot + self.tau * xacc
-                x = x + self.tau * x_dot
-                theta_dot = theta_dot + self.tau * thetaacc
-                theta = theta + self.tau * theta_dot
-
-            self.state = (x, x_dot, theta, theta_dot)
-
-            done = bool(
-                x < -self.x_threshold
-                or x > self.x_threshold
-                or theta < -self.theta_threshold_radians
-                or theta > self.theta_threshold_radians
-                or self.time == 200
-            )
-            
-            self.time += 1
-
-            if not done:
-                reward = 1.0
-            elif self.steps_beyond_done is None:
-                # Pole just fell!
-                self.steps_beyond_done = 0
-                reward = 1.0
-            else:
-                if self.steps_beyond_done == 0:
-                    logger.warn(
-                        "You are calling 'step()' even though this "
-                        "environment has already returned done = True. You "
-                        "should always call 'reset()' once you receive 'done = "
-                        "True' -- any further steps are undefined behavior."
-                    )
-                self.steps_beyond_done += 1
-                reward = 0.0
-
-            return np.array(self.state, dtype=np.float32), reward, done, {}
 
         def create_activation():
             if activation_fn_cfg is None:
@@ -228,6 +161,8 @@ class PhysicsGaussianMLP(Ensemble):
             #during training if the model preedicts logvar outside these bounds we want smooth transition
             logvar = self.max_logvar - F.softplus(self.max_logvar - logvar)
             logvar = self.min_logvar + F.softplus(logvar - self.min_logvar)
+
+            #We need to modify the mean vector with the output from phys_func function
             return mean, logvar
 
     def _forward_from_indices(
