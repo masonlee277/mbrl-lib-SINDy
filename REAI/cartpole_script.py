@@ -17,6 +17,8 @@ import mbrl.planning as planning
 import mbrl.util.common as common_util
 import mbrl.util as util
 
+from REAI.physics_models import SINDyModel, CartpoleModel
+
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 seed = 0
@@ -78,6 +80,8 @@ cfg = omegaconf.OmegaConf.create(cfg_dict)
 
 # Create a 1-D dynamics model for this environment
 dynamics_model = common_util.create_one_dim_tr_model(cfg, obs_shape, act_shape)
+dynamics_model.model.physics_model = SINDyModel() #None #CartpoleModel() #SINDyModel()
+
 
 # Create a gym-like environment to encapsulate the model
 model_env = models.ModelEnv(env, dynamics_model, term_fn, reward_fn, generator=generator)
@@ -92,6 +96,10 @@ common_util.rollout_agent_trajectories(
     replay_buffer=replay_buffer,
     trial_length=trial_length
 )
+
+#pretrain Sindy model on random trajectories
+if isinstance(dynamics_model.model.physics_model,SINDyModel):
+    dynamics_model.model.physics_model.train(replay_buffer)
 
 print("# samples stored", replay_buffer.num_stored)
 
@@ -147,7 +155,7 @@ def update_axes(_axs, _frame, _text, _trial, _steps_trial, _all_rewards, force_u
     display.clear_output(wait=True)
 
 
-    import numpy as np
+import numpy as np
 import math
 a = np.array(np.arange(45).reshape(5,3,3))
 #c,d,e,f = a[:-1]
@@ -208,14 +216,17 @@ for trial in range(num_trials):
                 num_epochs=50, 
                 patience=50, 
                 callback=train_callback,
-                silent=True)
+                silent=False)
+
+            if isinstance(dynamics_model.model.physics_model,SINDyModel):
+                dynamics_model.model.physics_model.train(replay_buffer)
 
         # --- Doing env step using the agent and adding to model dataset ---
         next_obs, reward, done, _ = common_util.step_env_and_add_to_buffer(
             env, obs, agent, {}, replay_buffer)
             
         update_axes(
-            axs, env.render(mode="rgb_array"), ax_text, trial, steps_trial, all_rewards)
+            axs, env.render(mode="rgb_array"), ax_text, trial, steps_trial, all_rewards, force_update=True)
         
         obs = next_obs
         total_reward += reward

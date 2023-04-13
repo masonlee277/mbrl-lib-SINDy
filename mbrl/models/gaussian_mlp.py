@@ -89,7 +89,7 @@ class GaussianMLP(Ensemble):
         super().__init__(
             ensemble_size, device, propagation_method, deterministic=deterministic
         )
-
+        self.physics_model = None
         self.in_size = in_size
         self.out_size = out_size
 
@@ -146,60 +146,60 @@ class GaussianMLP(Ensemble):
             self.mean_and_logvar.set_elite(self.elite_models)
             self.mean_and_logvar.toggle_use_only_elite()
 
-    def step_cartpole(self,state, action):
-            '''
-            ornly going to work for cartpole environment
-            TODO: modify to get the all cartpole variables from the gym enviroment
-            '''
+    # def step_cartpole(self,state, action):
+    #         '''
+    #         ornly going to work for cartpole environment
+    #         TODO: modify to get the all cartpole variables from the gym enviroment
+    #         '''
 
-            self.gravity = 9.8
-            self.masscart = 1.0
-            self.masspole = 0.1
-            self.total_mass = self.masspole + self.masscart
-            self.length = 0.5  # actually half the pole's length
-            self.polemass_length = self.masspole * self.length
-            self.force_mag = 10.0
-            self.tau = 0.02  # seconds between state updates
+    #         self.gravity = 9.8
+    #         self.masscart = 1.0
+    #         self.masspole = 0.1
+    #         self.total_mass = self.masspole + self.masscart
+    #         self.length = 0.5  # actually half the pole's length
+    #         self.polemass_length = self.masspole * self.length
+    #         self.force_mag = 10.0
+    #         self.tau = 0.02  # seconds between state updates
 
 
-            x, x_dot, theta, theta_dot = state[:,:,0:1], state[:,:,1:2], state[:,:,2:3], state[:,:,3:4]
-            #force = self.force_mag if action == 1 else -self.force_mag
-            force = action*(action==1)*self.force_mag - action*(action!=1)*self.force_mag
-            costheta = torch.cos(theta)
-            sintheta = torch.sin(theta)
+    #         x, x_dot, theta, theta_dot = state[..., 0:1], state[...,1:2], state[...,2:3], state[...,3:4]
+    #         #force = self.force_mag if action == 1 else -self.force_mag
+    #         force = (action*(action==1)*self.force_mag - action*(action!=1)*self.force_mag).unsqueeze(-1)
+    #         costheta = torch.cos(theta)
+    #         sintheta = torch.sin(theta)
 
-            # For the interested reader:
-            # https://coneural.org/florian/papers/05_cart_pole.pdf
-            temp = (
-                force + self.polemass_length * theta_dot ** 2 * sintheta
-            ) / self.total_mass
-            thetaacc = (self.gravity * sintheta - costheta * temp) / (
-                self.length * (4.0 / 3.0 - self.masspole * costheta ** 2 / self.total_mass)
-            )
-            xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
+    #         # For the interested reader:
+    #         # https://coneural.org/florian/papers/05_cart_pole.pdf
+    #         temp = (
+    #             force + self.polemass_length * theta_dot ** 2 * sintheta
+    #         ) / self.total_mass
+    #         thetaacc = (self.gravity * sintheta - costheta * temp) / (
+    #             self.length * (4.0 / 3.0 - self.masspole * costheta ** 2 / self.total_mass)
+    #         )
+    #         xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
 
-            self.kinematics_integrator = 'euler'
-            if self.kinematics_integrator == "euler":
-                x = x + self.tau * x_dot
-                x_dot = x_dot + self.tau * xacc
-                theta = theta + self.tau * theta_dot
-                theta_dot = theta_dot + self.tau * thetaacc
-            else:  # semi-implicit euler
-                x_dot = x_dot + self.tau * xacc
-                x = x + self.tau * x_dot
-                theta_dot = theta_dot + self.tau * thetaacc
-                theta = theta + self.tau * theta_dot
+    #         self.kinematics_integrator = 'euler'
+    #         if self.kinematics_integrator == "euler":
+    #             x = x + self.tau * x_dot
+    #             x_dot = x_dot + self.tau * xacc
+    #             theta = theta + self.tau * theta_dot
+    #             theta_dot = theta_dot + self.tau * thetaacc
+    #         else:  # semi-implicit euler
+    #             x_dot = x_dot + self.tau * xacc
+    #             x = x + self.tau * x_dot
+    #             theta_dot = theta_dot + self.tau * thetaacc
+    #             theta = theta + self.tau * theta_dot
 
-            self.state = torch.cat((x, x_dot, theta, theta_dot), dim = -1)
+    #         self.state = torch.cat((x, x_dot, theta, theta_dot), dim = -1)
 
-            return self.state
+    #         return self.state
 
     def _default_forward(
         self, x: torch.Tensor, only_elite: bool = False, **_kwargs
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         self._maybe_toggle_layers_use_only_elite(only_elite)
-        x = self.hidden_layers(x)
-        mean_and_logvar = self.mean_and_logvar(x)
+        xf = self.hidden_layers(x) #passing through hidden layers shape []
+        mean_and_logvar = self.mean_and_logvar(xf)
         self._maybe_toggle_layers_use_only_elite(only_elite)
         if self.deterministic:
             return mean_and_logvar, None
@@ -215,8 +215,16 @@ class GaussianMLP(Ensemble):
             logvar = self.max_logvar - F.softplus(self.max_logvar - logvar)
             logvar = self.min_logvar + F.softplus(logvar - self.min_logvar)
 
-            mean_phys = self.step_cartpole(x[:,:,:-1], x[:,:,-1][:,:,np.newaxis])
-            mean = mean + mean_phys
+            if self.physics_model is not None:
+                state, action = x[...,:-1], x[...,-1]
+                mean_phys = self.physics_model.predict(state, action)
+                #print(mean_phys.shape, mean.shape, state.shape) 
+
+                #print('mean\n', mean[0])
+                #print('phys \n' ,mean_phys[0] )
+
+                mean = mean + mean_phys
+                #print('using physics model, phys_mean: ', mean_phys)
             return mean, logvar
 
     def _forward_from_indices(
