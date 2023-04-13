@@ -218,7 +218,15 @@ class GaussianMLP(Ensemble):
             if self.physics_model is not None:
                 state, action = x[...,:-1], x[...,-1]
                 mean_phys = self.physics_model.predict(state, action)
-                #print(mean_phys.shape, mean.shape, state.shape) 
+
+
+                #TODO: add physics model to the hidden layers
+                #delta_phys = state - mean_phys
+                #next_state = self.hidden_layers(torch.concat[state,delta_phys,action]) #passing through hidden layers shape []
+
+                
+                #print(mean_phys.shape, mean.shape, state.shape)         xf = self.hidden_layers(x) #passing through hidden layers shape []
+
 
                 #print('mean\n', mean[0])
                 #print('phys \n' ,mean_phys[0] )

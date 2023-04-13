@@ -80,7 +80,7 @@ cfg = omegaconf.OmegaConf.create(cfg_dict)
 
 # Create a 1-D dynamics model for this environment
 dynamics_model = common_util.create_one_dim_tr_model(cfg, obs_shape, act_shape)
-dynamics_model.model.physics_model = SINDyModel() #None #CartpoleModel() #SINDyModel()
+dynamics_model.model.physics_model = CartpoleModel() #SINDyModel() #None #CartpoleModel() #SINDyModel()
 
 
 # Create a gym-like environment to encapsulate the model

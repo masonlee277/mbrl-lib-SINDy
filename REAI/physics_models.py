@@ -34,6 +34,11 @@ class CartpoleModel():
 
 
     def predict(self, state, action):
+        '''
+        returns delta on the state
+        '''
+
+
         x, x_dot, theta, theta_dot = state[..., 0:1], state[...,1:2], state[...,2:3], state[...,3:4]
         force = (action*(action==1)*self.force_mag - action*(action!=1)*self.force_mag).unsqueeze(-1)
         # print('force', force.shape)
@@ -51,19 +56,19 @@ class CartpoleModel():
         xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
 
         if self.kinematics_integrator == "euler":
-            x = x + self.tau * x_dot
-            x_dot = x_dot + self.tau * xacc
-            theta = theta + self.tau * theta_dot
-            theta_dot = theta_dot + self.tau * thetaacc
+            dx = self.tau * x_dot
+            dx_dot = self.tau * xacc
+            d_theta = self.tau * theta_dot
+            d_theta_dot = self.tau * thetaacc
         else:  # semi-implicit euler
             x_dot = x_dot + self.tau * xacc
             x = x + self.tau * x_dot
             theta_dot = theta_dot + self.tau * thetaacc
             theta = theta + self.tau * theta_dot
 
-        self.state = torch.cat((x, x_dot, theta, theta_dot), dim = -1)
+        self.dstate = torch.cat((dx, dx_dot, d_theta, d_theta_dot), dim = -1)
 
-        return self.state
+        return self.dstate
     
 
 class SINDyModel():
@@ -123,7 +128,9 @@ class SINDyModel():
         trajectories_list = [traj for traj in trajectories]
         action_list = [a for a in u]
 
-        self.model.fit(trajectories_list[:-3],u=action_list[:-3], multiple_trajectories=True)
+        #self.model.fit(trajectories_list[:-3],u=action_list[:-3], multiple_trajectories=True)
+        self.model.fit(trajectories_list,u=action_list, multiple_trajectories=True)
+        
         if self.print_model:
             self.model.print()
         
