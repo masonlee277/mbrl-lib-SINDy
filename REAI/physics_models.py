@@ -77,7 +77,7 @@ class SINDyModel():
     
     '''
     def __init__(self, 
-                    sparsity_threshold = 0.1, 
+                    sparsity_threshold = 0.01, 
                     der = ps.SmoothedFiniteDifference(),
                     functions = [lambda x : 1, 
                                  lambda x : x, 
@@ -98,9 +98,9 @@ class SINDyModel():
                               optimizer=self.optimizer)
         self.print_model = print_model
 
-    def train(self, replay_buffer):
-        d = replay_buffer.get_all()
-        print("# samples stored", replay_buffer.num_stored)
+    def extract_data_from_buffer(self, replay_buffer_test):
+        d = replay_buffer_test.get_all()
+        #print("# samples stored", replay_buffer_test.num_stored)
         tup = d.astuple() # self.obs, self.act, self.next_obs, self.rewards, self.dones
         observations = np.array(tup[0])
         actions = np.array(tup[1])
@@ -128,19 +128,41 @@ class SINDyModel():
         trajectories_list = [traj for traj in trajectories]
         action_list = [a for a in u]
 
-        #self.model.fit(trajectories_list[:-3],u=action_list[:-3], multiple_trajectories=True)
-        self.model.fit(trajectories_list,u=action_list, multiple_trajectories=True)
+        return trajectories_list, action_list
+
+
+    def train(self, replay_buffer, num_trails = None):
+
+        m  = ps.SINDy(discrete_time=True, 
+                              feature_library=self.lib, 
+                              differentiation_method=self.der,
+                              optimizer=self.optimizer)
+
+        trajectories_list, action_list = self.extract_data_from_buffer(replay_buffer)
+        if num_trails is not None: 
+            trajectories_list = trajectories_list[:num_trails]
+            action_list = action_list[:num_trails]# this is for measuring sindy lengths
+
+        print('training trajecotries: ', len(trajectories_list), num_trails)
+
+
+        m.fit(trajectories_list,u=action_list, multiple_trajectories=True)
+        self.model = m
         
+        self.print_model=False
         if self.print_model:
             self.model.print()
         
     
     def predict(self, state, action, num_steps = 1):
-        action = action.unsqueeze(-1)
+        action = np.array(action).unsqueeze(-1)
         action_tmp = action.cpu().numpy().reshape(-1, action.shape[-1])
         state_temp = state.cpu().numpy().reshape(-1,state.shape[-1])
         rollouts = np.array([self.model.simulate(state_i, num_steps, u=action_i) for state_i, action_i in zip(state_temp, action_tmp)]) 
         return torch.from_numpy(rollouts.reshape(state.shape)).float().to(state.device)
+    
+    def simulate(self, inital_state, action_list, num_steps):
+        return self.model.simulate(inital_state, num_steps, u = action_list)
 
 
 
