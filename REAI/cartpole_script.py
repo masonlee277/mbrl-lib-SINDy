@@ -1,7 +1,6 @@
 from IPython import display
 
-
-import matplotlib as mpl
+import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -52,6 +51,7 @@ cfg_dict = {
         "ensemble_size": ensemble_size,
         "hid_size": 200,
         "in_size": "???",
+        "in_features": "???",
         "out_size": "???",
         "deterministic": False, #probabilistic model
         "propagation_method": "fixed_model",
@@ -75,13 +75,31 @@ cfg_dict = {
         "model_batch_size": 32,
         "validation_ratio": 0.05
     }
-}
+    }
+
+# CONFIGURATIONS PHYSICS MODEL + NN
+
+#phys_nn_config = 0
+# 0: no physics model, only pets
+
+#phys_nn_config = 1: 
+#mean = NN(state, action) + physics_model.predict(state, action)
+#logvar = NN(state, action)
+
+#phys_nn_config = 2 
+#mean, logvar = NN(concat(physics_model.predict(state, action), state, action)
+# here hidden layers must be doubled 
+phys_nn_config = 0
+
+if phys_nn_config == 2:
+    cfg_dict['dynamics_model']['in_features'] = 2 * obs_shape[0] + (act_shape[0] if act_shape else 1)
+
 cfg = omegaconf.OmegaConf.create(cfg_dict)
 
 # Create a 1-D dynamics model for this environment
 dynamics_model = common_util.create_one_dim_tr_model(cfg, obs_shape, act_shape)
 dynamics_model.model.physics_model = CartpoleModel() #SINDyModel() #None #CartpoleModel() #SINDyModel()
-
+dynamics_model.model.phys_nn_config = phys_nn_config
 
 # Create a gym-like environment to encapsulate the model
 model_env = models.ModelEnv(env, dynamics_model, term_fn, reward_fn, generator=generator)
@@ -155,8 +173,6 @@ def update_axes(_axs, _frame, _text, _trial, _steps_trial, _all_rewards, force_u
     display.clear_output(wait=True)
 
 
-import numpy as np
-import math
 a = np.array(np.arange(45).reshape(5,3,3))
 #c,d,e,f = a[:-1]
 #print(c,d,e,f)

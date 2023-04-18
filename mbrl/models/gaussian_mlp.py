@@ -83,6 +83,7 @@ class GaussianMLP(Ensemble):
         propagation_method: Optional[str] = None,
         learn_logvar_bounds: bool = False,
         activation_fn_cfg: Optional[Union[Dict, omegaconf.DictConfig]] = None,
+        in_features: Optional[int] = None,
         #physics_dim: (for SINDy model)
         #SINDy model: 
     ):
@@ -90,9 +91,13 @@ class GaussianMLP(Ensemble):
             ensemble_size, device, propagation_method, deterministic=deterministic
         )
         self.physics_model = None
+        self.phys_nn_config = None
         self.in_size = in_size
         self.out_size = out_size
 
+        if in_features is None:
+            in_features = in_size
+        self.in_features = in_features
         
 
         def create_activation():
@@ -108,7 +113,7 @@ class GaussianMLP(Ensemble):
             return EnsembleLinearLayer(ensemble_size, l_in, l_out)
 
         hidden_layers = [
-            nn.Sequential(create_linear_layer(in_size, hid_size), create_activation())
+            nn.Sequential(create_linear_layer(in_features, hid_size), create_activation())
         ]
         for i in range(num_layers - 1):
             hidden_layers.append(
@@ -196,44 +201,60 @@ class GaussianMLP(Ensemble):
 
     def _default_forward(
         self, x: torch.Tensor, only_elite: bool = False, **_kwargs
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+            ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         self._maybe_toggle_layers_use_only_elite(only_elite)
-        xf = self.hidden_layers(x) #passing through hidden layers shape []
-        mean_and_logvar = self.mean_and_logvar(xf)
-        self._maybe_toggle_layers_use_only_elite(only_elite)
-        if self.deterministic:
-            return mean_and_logvar, None
-        else:
-            #predictions from ensemble are concatonated so we take each half
+
+
+        if self.phys_nn_config ==0: # only PETS
+            xf = self.hidden_layers(x) 
+            mean_and_logvar = self.mean_and_logvar(xf)
+
+            if self.deterministic:
+                return mean_and_logvar, None
+            
+            else:
+                mean = mean_and_logvar[..., : self.out_size]
+                logvar = mean_and_logvar[..., self.out_size :]
+
+
+
+        elif self.phys_nn_config ==1: # add means
+            assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
+
+            # phys model
+            state, action = x[...,:-1], x[...,-1]
+            mean_phys = self.physics_model.predict(state, action)
+
+            # NN 
+            xf = self.hidden_layers(x) 
+            mean_and_logvar = self.mean_and_logvar(xf)
+
+            #NN + phys model 
+            mean = mean_and_logvar[..., : self.out_size] + mean_phys
+            logvar = mean_and_logvar[..., self.out_size :]
+
+
+        elif self.phys_nn_config ==2: # phys_model to  NN
+            assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
+            state, action = x[...,:-1], x[...,-1]
+            mean_phys = self.physics_model.predict(state, action)
+
+            #pass prediction through NN
+            xin = torch.cat((mean_phys, state, action.unsqueeze(-1)), dim=-1)        
+            xf = self.hidden_layers(xin) #passing through hidden layers shape []
+            mean_and_logvar = self.mean_and_logvar(xf)
+
             mean = mean_and_logvar[..., : self.out_size]
             logvar = mean_and_logvar[..., self.out_size :]
 
-            #constraitns to log-variancce (range upper and lower bbound)
-            #softplus creates a smooth transition between original value and constrained value
-            #takes real number as input and returns another real number been 0--inf
-            #during training if the model preedicts logvar outside these bounds we want smooth transition
-            logvar = self.max_logvar - F.softplus(self.max_logvar - logvar)
-            logvar = self.min_logvar + F.softplus(logvar - self.min_logvar)
+        #constraitns to log-variancce (range upper and lower bbound)
+        #softplus creates a smooth transition between original value and constrained value
+        #takes real number as input and returns another real number been 0--inf
+        #during training if the model preedicts logvar outside these bounds we want smooth transition
+        logvar = self.max_logvar - F.softplus(self.max_logvar - logvar)
+        logvar = self.min_logvar + F.softplus(logvar - self.min_logvar)
 
-            if self.physics_model is not None:
-                state, action = x[...,:-1], x[...,-1]
-                mean_phys = self.physics_model.predict(state, action)
-
-
-                #TODO: add physics model to the hidden layers
-                #delta_phys = state - mean_phys
-                #next_state = self.hidden_layers(torch.concat[state,delta_phys,action]) #passing through hidden layers shape []
-
-                
-                #print(mean_phys.shape, mean.shape, state.shape)         xf = self.hidden_layers(x) #passing through hidden layers shape []
-
-
-                #print('mean\n', mean[0])
-                #print('phys \n' ,mean_phys[0] )
-
-                mean = mean + mean_phys
-                #print('using physics model, phys_mean: ', mean_phys)
-            return mean, logvar
+        return mean, logvar
 
     def _forward_from_indices(
         self, x: torch.Tensor, model_shuffle_indices: torch.Tensor
