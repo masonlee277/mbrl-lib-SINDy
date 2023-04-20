@@ -3,7 +3,7 @@ import math
 
 import numpy as np
 import pysindy as ps
-
+import matplotlib.pyplot as plt
 # class PhysicsModel():
 
 #     def __init__(self) -> None:
@@ -19,7 +19,7 @@ class CartpoleModel():
                 masspole = 0.1,
                 length = 0.5,       # actually half the pole's length
                 force_mag = 10.0,
-                tau = 0.02,         # seconds between state updates
+                tau = 1, #0.02,         # seconds between state updates
                 kinematics_integrator = 'euler'):
                 
         self.gravity = gravity
@@ -111,18 +111,23 @@ class SINDyModel():
         #print(actions.shape)
 
         trajectory_splits = np.where(dones)[0] + 1
-        trajectories = np.split(observations, trajectory_splits)
-        u = np.split(actions, trajectory_splits)
+        trajectories = np.split(observations, trajectory_splits[:-1])
+        u = np.split(actions, trajectory_splits[:-1])
 
         total_steps = 0
         # Print the individual trajectories
         #print('# of different trajectories: ', len(trajectories))
+        trajectories_list = []
+        action_list = []
         for i, (traj, act_seq) in enumerate(zip(trajectories,u)):
             #print(f'Trajectory {i + 1}:')
             total_steps += traj.shape[0]
+            #if traj.shape[0] >0:
+            #    trajectories_list.append(traj)
+            #    action_list.append(act_seq)
             #print(traj.shape, act_seq.shape)
             #print()
-        #print('total steps: ', total_steps)
+        print('total steps: ', total_steps)
 
         # Convert the NumPy array of arrays to a list of arrays
         trajectories_list = [traj for traj in trajectories]
@@ -152,17 +157,33 @@ class SINDyModel():
         self.print_model=False
         if self.print_model:
             self.model.print()
-        
+
+
+    def simulate(self, inital_state, action_list, num_steps):
+        return self.model.simulate(inital_state, num_steps, u = action_list)
     
-    def predict(self, state, action, num_steps = 1):
-        action = np.array(action).unsqueeze(-1)
+
+    def predict(self, state, action, num_steps = 1, plot = False):
+        
+        action = action.unsqueeze(-1)
         action_tmp = action.cpu().numpy().reshape(-1, action.shape[-1])
         state_temp = state.cpu().numpy().reshape(-1,state.shape[-1])
         rollouts = np.array([self.model.simulate(state_i, num_steps, u=action_i) for state_i, action_i in zip(state_temp, action_tmp)]) 
-        return torch.from_numpy(rollouts.reshape(state.shape)).float().to(state.device)
-    
-    def simulate(self, inital_state, action_list, num_steps):
-        return self.model.simulate(inital_state, num_steps, u = action_list)
+        rollouts = rollouts.reshape(state.shape)
+
+        if plot:
+            nftrs = state.shape[-1]
+
+            plt.figure()
+            for i in range(nftrs):
+                plt.subplot(nftrs,1, i+1)
+                plt.plot(rollouts[0,:, i], label = 'SINDy')
+                plt.plot(state[0, :,  i], '-o', label = 'true')
+                plt.legend()
+            plt.show()
+
+
+        return torch.from_numpy(rollouts).float().to(state.device)
 
 
 
