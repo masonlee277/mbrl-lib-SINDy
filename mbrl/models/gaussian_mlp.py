@@ -252,7 +252,7 @@ class GaussianMLP(Ensemble):
             state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
 
-            mean = state + mean_phys
+            mean = mean_phys
             logvar = None
             #logvar = mean_and_logvar[..., self.out_size :]
 

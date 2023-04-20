@@ -19,7 +19,7 @@ class CartpoleModel():
                 masspole = 0.1,
                 length = 0.5,       # actually half the pole's length
                 force_mag = 10.0,
-                tau = 1, #0.02,         # seconds between state updates
+                tau = 0.02,         # seconds between state updates
                 kinematics_integrator = 'euler'):
                 
         self.gravity = gravity
@@ -40,10 +40,8 @@ class CartpoleModel():
 
 
         x, x_dot, theta, theta_dot = state[..., 0:1], state[...,1:2], state[...,2:3], state[...,3:4]
-        force = (action*(action==1)*self.force_mag - action*(action!=1)*self.force_mag).unsqueeze(-1)
-        # print('force', force.shape)
-        # print('action', action.shape)
-        # print('state', state.shape)
+        # force = (action*(action==1)*self.force_mag - action*(action!=1)*self.force_mag).unsqueeze(-1)
+        force = action[...,np.newaxis]*self.force_mag
         
         costheta = torch.cos(theta)
         sintheta = torch.sin(theta)
