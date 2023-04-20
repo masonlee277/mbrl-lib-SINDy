@@ -19,7 +19,7 @@ class CartpoleModel():
                 masspole = 0.1,
                 length = 0.5,       # actually half the pole's length
                 force_mag = 10.0,
-                tau = 1, #0.02,         # seconds between state updates
+                tau = 0.02,         # seconds between state updates
                 kinematics_integrator = 'euler'):
                 
         self.gravity = gravity
