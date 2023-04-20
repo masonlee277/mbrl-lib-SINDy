@@ -1,7 +1,6 @@
 from IPython import display
 
-
-import matplotlib as mpl
+import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -22,7 +21,7 @@ from REAI.physics_models import SINDyModel, CartpoleModel
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 seed = 0
-env = cartpole_env.CartPoleEnv(track_friction=.1, joint_friction=.1)
+env = cartpole_env.CartPoleEnv(track_friction=0.1, joint_friction=0.1)
 env.seed(seed)
 rng = np.random.default_rng(seed=0)
 generator = torch.Generator(device=device)
@@ -37,7 +36,7 @@ reward_fn = reward_fns.cartpole
 term_fn = termination_fns.cartpole
 
 trial_length = 200
-num_trials = 10
+num_trials = 20
 ensemble_size = 5
 
 # Everything with "???" indicates an option with a missing value.
@@ -52,6 +51,7 @@ cfg_dict = {
         "ensemble_size": ensemble_size,
         "hid_size": 200,
         "in_size": "???",
+        "in_features": "???",
         "out_size": "???",
         "deterministic": False,  # probabilistic model
         "propagation_method": "fixed_model",
@@ -72,14 +72,42 @@ cfg_dict = {
         "validation_ratio": 0.05,
     },
 }
+
+# CONFIGURATIONS PHYSICS MODEL + NN
+
+# phys_nn_config = 0
+# 0: no physics model, only pets
+
+# phys_nn_config = 1:
+# mean = NN(state, action) + physics_model.predict(state, action)
+# logvar = NN(state, action)
+
+# phys_nn_config = 2
+# mean, logvar = NN(concat(physics_model.predict(state, action), state, action)
+# here hidden layers must be doubled
+
+# phys_nn_config = 3
+# only physics model
+
+phys_nn_config = 3
+
+if phys_nn_config == 2:
+    cfg_dict["dynamics_model"]["in_features"] = 2 * obs_shape[0] + (
+        act_shape[0] if act_shape else 1
+    )
+
+
+if phys_nn_config == 3:
+    cfg_dict["dynamics_model"]["deterministic"] = True
+
 cfg = omegaconf.OmegaConf.create(cfg_dict)
 
 # Create a 1-D dynamics model for this environment
 dynamics_model = common_util.create_one_dim_tr_model(cfg, obs_shape, act_shape)
 dynamics_model.model.physics_model = (
     CartpoleModel()
-)  # SINDyModel() #None #CartpoleModel() #SINDyModel()
-
+)  # CartpoleModel() #SINDyModel() #None #CartpoleModel() #SINDyModel()
+dynamics_model.model.phys_nn_config = phys_nn_config
 
 # Create a gym-like environment to encapsulate the model
 model_env = models.ModelEnv(
@@ -220,14 +248,18 @@ for trial in range(num_trials):
             # SINDy loss is recorded in forward pass
             # dynamics_model.set_sindy(sindy)
 
-            model_trainer.train(
-                dataset_train,
-                dataset_val=dataset_val,
-                num_epochs=50,
-                patience=50,
-                callback=train_callback,
-                silent=False,
-            )
+            # SINDy loss is recorded in forward pass
+            # dynamics_model.set_sindy(sindy)
+
+            if phys_nn_config != 3:
+                model_trainer.train(
+                    dataset_train,
+                    dataset_val=dataset_val,
+                    num_epochs=50,
+                    patience=50,
+                    callback=train_callback,
+                    silent=False,
+                )
 
             if isinstance(dynamics_model.model.physics_model, SINDyModel):
                 dynamics_model.model.physics_model.train(replay_buffer)

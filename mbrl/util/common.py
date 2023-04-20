@@ -81,6 +81,8 @@ def create_one_dim_tr_model(
         model_cfg = model_cfg.member_cfg
     if model_cfg.get("in_size", None) is None:
         model_cfg.in_size = obs_shape[0] + (act_shape[0] if act_shape else 1)
+    if model_cfg.get("in_features", None) is None:
+        model_cfg.in_features = model_cfg.in_size
     if model_cfg.get("out_size", None) is None:
         model_cfg.out_size = obs_shape[0] + int(cfg.algorithm.learned_rewards)
 
