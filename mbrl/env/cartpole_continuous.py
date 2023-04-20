@@ -78,6 +78,13 @@ class CartPoleEnv(gym.Env):
 
         # For the interested reader:
         # https://coneural.org/florian/papers/05_cart_pole.pdf
+        # temp = (
+        #     force + self.polemass_length * theta_dot ** 2 * sintheta
+        # ) / self.total_mass
+        # thetaacc = (self.gravity * sintheta - costheta * temp) / (
+        #     self.length * (4.0 / 3.0 - self.masspole * costheta ** 2 / self.total_mass)
+        # )
+        # xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
 
         temp = (
             force + self.polemass_length * theta_dot**2 * sintheta
@@ -102,7 +109,7 @@ class CartPoleEnv(gym.Env):
                 / self.total_mass
             )
         )
-        # The system of equations is impossible to solve with sgn function
+        # # The system of equations is impossible to solve with sgn function
         # But we assume that thetaacc is small enough to not flip the sign of N_c
         # If this fails it means that we haved reached outside of the model's predictive power
         # Revise the paper above if you want to fix it

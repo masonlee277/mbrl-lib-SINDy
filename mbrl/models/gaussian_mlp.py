@@ -247,12 +247,12 @@ class GaussianMLP(Ensemble):
             mean = mean_and_logvar[..., : self.out_size]
             logvar = mean_and_logvar[..., self.out_size :]
 
-        elif self.phys_nn_config ==3: # phys_model to  NN
+        elif self.phys_nn_config ==3: # only phys_model
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
             state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
 
-            mean = state + mean_phys
+            mean = mean_phys
             logvar = None
             #logvar = mean_and_logvar[..., self.out_size :]
 

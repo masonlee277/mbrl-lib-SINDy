@@ -17,6 +17,7 @@ import mbrl.util.common as common_util
 import mbrl.util as util
 
 from REAI.physics_models import SINDyModel, CartpoleModel
+from REAI.physics_models import trajectories_from_replay_buffer
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -36,7 +37,7 @@ reward_fn = reward_fns.cartpole
 term_fn = termination_fns.cartpole
 
 trial_length = 200
-num_trials = 20
+num_trials = 10
 ensemble_size = 5
 
 # Everything with "???" indicates an option with a missing value.
@@ -104,9 +105,7 @@ cfg = omegaconf.OmegaConf.create(cfg_dict)
 
 # Create a 1-D dynamics model for this environment
 dynamics_model = common_util.create_one_dim_tr_model(cfg, obs_shape, act_shape)
-dynamics_model.model.physics_model = (
-    CartpoleModel()
-)  # CartpoleModel() #SINDyModel() #None #CartpoleModel() #SINDyModel()
+dynamics_model.model.physics_model = CartpoleModel()  # CartpoleModel() #SINDyModel() #None #CartpoleModel() #SINDyModel()
 dynamics_model.model.phys_nn_config = phys_nn_config
 
 # Create a gym-like environment to encapsulate the model
@@ -118,7 +117,7 @@ replay_buffer = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=
 
 common_util.rollout_agent_trajectories(
     env,
-    trial_length,  # initial exploration steps
+    trial_length * 10,  # initial exploration steps
     planning.RandomAgent(env),
     {},  # keyword arguments to pass to agent.act()
     replay_buffer=replay_buffer,
@@ -128,6 +127,52 @@ common_util.rollout_agent_trajectories(
 # pretrain Sindy model on random trajectories
 if isinstance(dynamics_model.model.physics_model, SINDyModel):
     dynamics_model.model.physics_model.train(replay_buffer)
+
+
+#check physics model
+
+def check_physics_model(replay_buffer):
+    trajectories_list, action_list  = trajectories_from_replay_buffer(replay_buffer)
+    test_trajectory = trajectories_list[1]
+    test_actions = action_list[1]
+
+    predicted_states = []
+    predicted_states_own = []
+    next_state = test_trajectory[0]
+    for i in range(len(test_trajectory)):
+        state = torch.tensor(test_trajectory[i])
+        action = torch.tensor(test_actions[i])
+        
+        #predicting recursively (from its own prediction)
+        predicted_states_own.append(np.array(dynamics_model.model.physics_model.predict(torch.tensor(next_state), action)))
+        
+        #predicting from actual state
+        next_state = np.array(dynamics_model.model.physics_model.predict(state, action))
+        predicted_states.append(next_state)
+
+    predicted_states = np.array(predicted_states)
+    predicted_states_own = np.array(predicted_states_own)
+
+    plt.figure()
+    state_dims = state.shape[0]
+    for j in range(state_dims):
+        plt.subplot(state_dims, 2, 2*j + 1)
+        plt.plot( predicted_states[:-1, j] ,  label='model prediction from state')
+        plt.plot( predicted_states_own[:-1, j] ,  label='model prediction recursive')        
+        plt.plot( test_trajectory[1:, j],  label='true trajectory')
+
+
+        plt.subplot(state_dims, 2, 2 *j + 2)
+        plt.plot( np.abs(predicted_states[:-1, j] - test_trajectory[1:, j])  ,  label='model prediction from state')
+        plt.plot( np.abs(predicted_states_own[:-1, j]- test_trajectory[1:, j]) ,  label='model prediction recursive')        
+        plt.title('Errors')
+    plt.legend()
+    plt.show()
+
+check_physics_model(replay_buffer)
+print("num stored", replay_buffer.num_stored)
+
+
 
 print("# samples stored", replay_buffer.num_stored)
 
@@ -261,8 +306,8 @@ for trial in range(num_trials):
                     silent=False,
                 )
 
-            if isinstance(dynamics_model.model.physics_model, SINDyModel):
-                dynamics_model.model.physics_model.train(replay_buffer)
+        if isinstance(dynamics_model.model.physics_model, SINDyModel):
+            dynamics_model.model.physics_model.train(replay_buffer)
 
         # --- Doing env step using the agent and adding to model dataset ---
         next_obs, reward, done, _ = common_util.step_env_and_add_to_buffer(
