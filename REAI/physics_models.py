@@ -161,21 +161,21 @@ class SINDyModel():
         rollouts = np.array([self.model.simulate(state_i, num_steps + 1, u=action_i)[1:] for state_i, action_i in zip(state_temp, action_tmp)]) 
         rollouts = rollouts.reshape(state.shape)
         
-        rollouts0 = np.array([self.model.simulate(state_i, num_steps + 1, u=action_i)[:1] for state_i, action_i in zip(state_temp, action_tmp)]) 
-        rollouts0 = rollouts0.reshape(state.shape)
+        # rollouts0 = np.array([self.model.simulate(state_i, num_steps + 1, u=action_i)[:1] for state_i, action_i in zip(state_temp, action_tmp)]) 
+        # rollouts0 = rollouts0.reshape(state.shape)
 
         if overflow_cap:
             rollouts[np.abs(rollouts) >overflow_cap] = overflow_cap
 
-        if len(rollouts.shape) > 1: 
-            print(rollouts.reshape(-1, 4)[0, :])
-            print(rollouts0.reshape(-1, 4)[0, :])
-            print(state.reshape(-1, 4)[0, :]) 
-        else:
+        # if len(rollouts.shape) > 1: 
+        #     print(rollouts.reshape(-1, 4)[0, :])
+        #     print(rollouts0.reshape(-1, 4)[0, :])
+        #     print(state.reshape(-1, 4)[0, :]) 
+        # else:
 
-            print(rollouts)
-            print(rollouts0)
-            print(state)
+        #     print(rollouts)
+        #     print(rollouts0)
+        #     print(state)
 
         if plot:
             nftrs = state.shape[-1]
