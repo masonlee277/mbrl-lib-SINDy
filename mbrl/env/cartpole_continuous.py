@@ -86,41 +86,51 @@ class CartPoleEnv(gym.Env):
         # )
         # xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
 
+
+        # temp = (
+        #     force + self.polemass_length * theta_dot**2 * sintheta
+        # ) / self.total_mass·
+        # temp2 = (
+        #     -temp
+        #     + self.polemass_length * theta_dot**2 * costheta / self.total_mass
+        #     + friction_coeff * self.gravity
+        # )
+        # thetaacc = (
+        #     self.gravity * sintheta
+        #     + costheta * temp2
+        #     # Join Friction Term
+        #     - self.joint_friction * theta_dot / self.polemass_length
+        # ) / (
+        #     self.length
+        #     * (
+        #         4.0 / 3.0
+        #         - self.masspole
+        #         * costheta
+        #         * (costheta - friction_coeff)
+        #         / self.total_mass
+        #     )
+        # )
+        # # The system of equations is impossible to solve with sgn function
+        # # But we assume that thetaacc is small enough to not flip the sign of N_c
+        # # If this fails it means that we haved reached outside of the model's predictive power
+        # # Revise the paper above if you want to fix it
+        # N_c = self.total_mass * self.gravity - self.polemass_length * (
+        #     thetaacc * sintheta + theta_dot**2 * costheta
+        # )
+        # assert N_c >= 0.0
+
+
+        # xacc = (
+        #     temp - self.polemass_length * thetaacc * costheta - N_c * friction_coeff
+        # ) / self.total_mass
+        
         temp = (
             force + self.polemass_length * theta_dot**2 * sintheta
         ) / self.total_mass
-        temp2 = (
-            -temp
-            + self.polemass_length * theta_dot**2 * costheta / self.total_mass
-            + friction_coeff * self.gravity
+        thetaacc = (self.gravity * sintheta - costheta * temp) / (
+            self.length * (4.0 / 3.0 - self.masspole * costheta**2 / self.total_mass)
         )
-        thetaacc = (
-            self.gravity * sintheta
-            + costheta * temp2
-            # Join Friction Term
-            - self.joint_friction * theta_dot / self.polemass_length
-        ) / (
-            self.length
-            * (
-                4.0 / 3.0
-                - self.masspole
-                * costheta
-                * (costheta - friction_coeff)
-                / self.total_mass
-            )
-        )
-        # # The system of equations is impossible to solve with sgn function
-        # But we assume that thetaacc is small enough to not flip the sign of N_c
-        # If this fails it means that we haved reached outside of the model's predictive power
-        # Revise the paper above if you want to fix it
-        N_c = self.total_mass * self.gravity - self.polemass_length * (
-            thetaacc * sintheta + theta_dot**2 * costheta
-        )
-        assert N_c >= 0.0
-
-        xacc = (
-            temp - self.polemass_length * thetaacc * costheta - N_c * friction_coeff
-        ) / self.total_mass
+        xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
 
         if self.kinematics_integrator == "euler":
             x = x + self.tau * x_dot
@@ -135,12 +145,14 @@ class CartPoleEnv(gym.Env):
 
         self.state = (x, x_dot, theta, theta_dot)
 
-        done = bool(
-            x < -self.x_threshold
-            or x > self.x_threshold
-            or theta < -self.theta_threshold_radians
-            or theta > self.theta_threshold_radians
-        )
+        if x < -self.x_threshold or x > self.x_threshold:
+            print('Termination Due to Out of Bounds')
+            done = True
+        elif theta < -self.theta_threshold_radians or theta > self.theta_threshold_radians:
+            print('Termination Due to Falling too Far')
+            done = True
+        else:
+            done = False
 
         if not done:
             reward = 1.0

@@ -22,7 +22,7 @@ from REAI.physics_models import trajectories_from_replay_buffer
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 seed = 0
-env = cartpole_env.CartPoleEnv(track_friction=0.1, joint_friction=0.1)
+env = cartpole_env.CartPoleEnv()
 env.seed(seed)
 rng = np.random.default_rng(seed=0)
 generator = torch.Generator(device=device)
@@ -39,6 +39,7 @@ term_fn = termination_fns.cartpole
 trial_length = 200
 num_trials = 10
 ensemble_size = 5
+rendering = False
 
 # Everything with "???" indicates an option with a missing value.
 # Our utility functions will fill in these details using the
@@ -263,9 +264,10 @@ for trial in range(num_trials):
     done = False
     total_reward = 0.0
     steps_trial = 0
-    update_axes(
-        axs, env.render(mode="rgb_array"), ax_text, trial, steps_trial, all_rewards
-    )
+    if rendering:
+        update_axes(
+            axs, env.render(mode="rgb_array"), ax_text, trial, steps_trial, all_rewards
+        )
 
     # dataset
 
@@ -314,15 +316,16 @@ for trial in range(num_trials):
             env, obs, agent, {}, replay_buffer
         )
 
-        update_axes(
-            axs,
-            env.render(mode="rgb_array"),
-            ax_text,
-            trial,
-            steps_trial,
-            all_rewards,
-            force_update=True,
-        )
+        if rendering:
+            update_axes(
+                axs,
+                env.render(mode="rgb_array"),
+                ax_text,
+                trial,
+                steps_trial,
+                all_rewards,
+                force_update=True,
+            )
 
         obs = next_obs
         total_reward += reward
@@ -334,15 +337,16 @@ for trial in range(num_trials):
     all_rewards.append(total_reward)
     print("Total reward:", total_reward)
 
-    update_axes(
-        axs,
-        env.render(mode="rgb_array"),
-        ax_text,
-        trial,
-        steps_trial,
-        all_rewards,
-        force_update=True,
-    )
+    if rendering:
+        update_axes(
+            axs,
+            env.render(mode="rgb_array"),
+            ax_text,
+            trial,
+            steps_trial,
+            all_rewards,
+            force_update=True,
+        )
 
 fig, ax = plt.subplots(2, 1, figsize=(12, 10))
 ax[0].plot(train_losses)
@@ -353,11 +357,11 @@ ax[1].set_xlabel("Total training epochs")
 ax[1].set_ylabel("Validation score (avg. MSE)")
 plt.show()
 
-
-fig, ax = plt.subplots(1, 1)
-ax.set_xlim([0, num_trials + 0.1])
-ax.set_ylim([0, 200])
-ax.set_xlabel("Trial")
-ax.set_ylabel("Trial reward")
-ax.plot(all_rewards, "bs-")
-plt.show()
+if not rendering:
+    fig, ax = plt.subplots(1, 1)
+    ax.set_xlim([0, num_trials + 0.1])
+    ax.set_ylim([0, 200])
+    ax.set_xlabel("Trial")
+    ax.set_ylabel("Trial reward")
+    ax.plot(all_rewards, "bs-")
+    plt.show()

@@ -70,7 +70,7 @@ class CartpoleModel():
 
     def predict(self, state, action):
         '''
-        returns delta on the state
+        returns the state
         '''
 
 
