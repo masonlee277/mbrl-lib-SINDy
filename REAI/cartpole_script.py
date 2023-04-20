@@ -117,7 +117,7 @@ replay_buffer = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=
 
 common_util.rollout_agent_trajectories(
     env,
-    trial_length * 10,  # initial exploration steps
+    trial_length,  # initial exploration steps
     planning.RandomAgent(env),
     {},  # keyword arguments to pass to agent.act()
     replay_buffer=replay_buffer,
