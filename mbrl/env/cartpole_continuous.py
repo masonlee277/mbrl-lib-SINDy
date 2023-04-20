@@ -12,14 +12,29 @@ class CartPoleEnv(gym.Env):
     # a multiplicative factor to the total force.
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": [50]}
 
-    def __init__(self):
-        self.gravity = 9.8
-        self.masscart = 1.0
-        self.masspole = 0.1
+    def __init__(
+        self,
+        gravity=9.8,
+        masscart=1.0,
+        masspole=0.1,
+        length=0.5,
+        force_mag=10.0,
+        track_friction=0.0,
+        joint_friction=0.0,
+    ):
+        self.gravity = gravity
+        self.masscart = masscart
+        self.masspole = masspole
         self.total_mass = self.masspole + self.masscart
-        self.length = 0.5  # actually half the pole's length
+        self.length = length  # actually half the pole's length
         self.polemass_length = self.masspole * self.length
-        self.force_mag = 10.0
+        self.force_mag = force_mag
+        self.track_friction = (
+            track_friction  # Dynamic coefficient of friction btwn track and cart
+        )
+        self.joint_friction = (
+            joint_friction  # Dynamic coefficient of friction btwn pole and cart
+        )
         self.tau = 0.02  # seconds between state updates
         self.kinematics_integrator = "euler"
 
@@ -59,16 +74,46 @@ class CartPoleEnv(gym.Env):
         force = action * self.force_mag
         costheta = math.cos(theta)
         sintheta = math.sin(theta)
+        friction_coeff = self.track_friction * np.sign(x_dot)
 
         # For the interested reader:
         # https://coneural.org/florian/papers/05_cart_pole.pdf
+
         temp = (
             force + self.polemass_length * theta_dot**2 * sintheta
         ) / self.total_mass
-        thetaacc = (self.gravity * sintheta - costheta * temp) / (
-            self.length * (4.0 / 3.0 - self.masspole * costheta**2 / self.total_mass)
+        temp2 = (
+            -temp
+            + self.polemass_length * theta_dot**2 * costheta / self.total_mass
+            + friction_coeff * self.gravity
         )
-        xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
+        thetaacc = (
+            self.gravity * sintheta
+            + costheta * temp2
+            # Join Friction Term
+            - self.joint_friction * theta_dot / self.polemass_length
+        ) / (
+            self.length
+            * (
+                4.0 / 3.0
+                - self.masspole
+                * costheta
+                * (costheta - friction_coeff)
+                / self.total_mass
+            )
+        )
+        # The system of equations is impossible to solve with sgn function
+        # But we assume that thetaacc is small enough to not flip the sign of N_c
+        # If this fails it means that we haved reached outside of the model's predictive power
+        # Revise the paper above if you want to fix it
+        N_c = self.total_mass * self.gravity - self.polemass_length * (
+            thetaacc * sintheta + theta_dot**2 * costheta
+        )
+        assert N_c >= 0.0
+
+        xacc = (
+            temp - self.polemass_length * thetaacc * costheta - N_c * friction_coeff
+        ) / self.total_mass
 
         if self.kinematics_integrator == "euler":
             x = x + self.tau * x_dot
