@@ -193,7 +193,7 @@ class SINDyModel():
             self.model.print()
         
     
-    def predict(self, state, action, num_steps = 1, plot = False, overflow_clipp = 1e6):
+    def predict(self, state, action, num_steps = 1, plot = False, overflow_clipp = 1e6, run_with_dask = True):
 
         state_np = state.cpu().numpy().reshape(-1, state.shape[-1])
         batch_size = state_np.shape[0]
@@ -210,16 +210,53 @@ class SINDyModel():
         else:
             multiple_trjectories = False
 
-        #def f(u, x):
-        dx = np.array(self.model.predict(state_np, u=action_np, multiple_trajectories= multiple_trjectories))
+        def f(x, u):
+            if len(x.shape)==1:
+                x = x[np.newaxis, :]
+            if len(u.shape)==1:
+                u = u[np.newaxis, :]
+            #print(x.shape, u.shape)
+
+            batch_size = x.shape[0]
+            if batch_size>1:
+                multiple_trjectories = True
+            else:
+                multiple_trjectories = False
+
+
+            dx = self.model.predict(x, u=u, multiple_trajectories= multiple_trjectories)
+            #convert to array and replace inf with 1e6
+            dx = np.array(dx, dtype=np.float32)
+            dx[dx>overflow_clipp] = overflow_clipp
+            dx[dx<-overflow_clipp] = -overflow_clipp
+            return dx
+
+        if batch_size>8:
+            print('Running with dask')
+            if run_with_dask:
+                u_bag = db.from_sequence(action_np)
+                x_bag = db.from_sequence(state_np)
+
+                dx_bag = x_bag.map(f, u_bag)
+                #bag = db.from_sequence(zip(action_np, state_np), npartitions=8)
+                dx = dx_bag.compute()
+            
+        else:
+            dx = [f(x, u) for x, u in zip(state_np, action_np) ]
+
+        dx = np.array(dx, dtype=np.float32)
+
+        #dx = self.model.predict(state_np, u=action_np, multiple_trajectories= multiple_trjectories)
+        #convert to array and replace inf with 1e6
+
+
         #    return dx
         
         #delayed_f = delayed(f)
         #dx = da.map()
         # rollouts0 = np.array([self.model.simulate(state_i, num_steps + 1, u=action_i)[:1] for state_i, action_i in zip(state_temp, action_tmp)]) 
         # rollouts0 = rollouts0.reshape(state.shape)
-        # if overflow_cap:
-        #     rollouts[np.abs(rollouts) >overflow_cap] = overflow_cap
+        
         ts = time.time() - t0
         print(batch_size)
         print('Sindy simulation time: ', ts)
