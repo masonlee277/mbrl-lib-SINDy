@@ -91,7 +91,7 @@ cfg_dict = {
 # phys_nn_config = 3
 # only physics model
 
-phys_nn_config = 0
+phys_nn_config = 3
 
 if phys_nn_config == 2:
     cfg_dict["dynamics_model"]["in_features"] = 2 * obs_shape[0] + (

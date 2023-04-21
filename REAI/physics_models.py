@@ -15,6 +15,41 @@ import dask.bag as db
 #     def predict(self, state, action):
 #         raise NotImplementedError
 
+def trajectories_from_replay_buffer(replay_buffer):
+        d = replay_buffer.get_all()
+        print("# samples stored", replay_buffer.num_stored)
+        tup = d.astuple() # self.obs, self.act, self.next_obs, self.rewards, self.dones
+        observations = np.array(tup[0])
+        actions = np.array(tup[1])
+        dones = np.array(tup[-1])
+
+        #print(observations.shape)
+        #print(dones.shape)
+        #print(actions.shape)
+
+        trajectory_splits = np.where(dones)[0] + 1
+        trajectories = np.split(observations, trajectory_splits[:-1])
+        u = np.split(actions, trajectory_splits[:-1])
+
+        total_steps = 0
+        # Print the individual trajectories
+        #print('# of different trajectories: ', len(trajectories))
+        trajectories_list = []
+        action_list = []
+        for i, (traj, act_seq) in enumerate(zip(trajectories,u)):
+            #print(f'Trajectory {i + 1}:')
+            total_steps += traj.shape[0]
+            #if traj.shape[0] >0:
+            #    trajectories_list.append(traj)
+            #    action_list.append(act_seq)
+            #print(traj.shape, act_seq.shape)
+            #print()
+        print('total steps: ', total_steps)
+
+        # Convert the NumPy array of arrays to a list of arrays
+        trajectories_list = [traj for traj in trajectories]
+        action_list = [a for a in u]
+        return trajectories_list, action_list
 
 class CartpoleModel():
     def __init__(self, 
