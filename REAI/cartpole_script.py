@@ -91,7 +91,7 @@ cfg_dict = {
 # phys_nn_config = 3
 # only physics model
 
-phys_nn_config = 3
+phys_nn_config = 0
 
 if phys_nn_config == 2:
     cfg_dict["dynamics_model"]["in_features"] = 2 * obs_shape[0] + (
@@ -257,7 +257,7 @@ ax_text = axs[0].text(300, 50, "")
 
 # Main PETS loop
 all_rewards = [0]
-for trial in range(num_trials):
+for trial in range(5):
     obs = env.reset()
     agent.reset()
 

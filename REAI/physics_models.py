@@ -15,41 +15,6 @@ import dask.bag as db
 #     def predict(self, state, action):
 #         raise NotImplementedError
 
-def trajectories_from_replay_buffer(replay_buffer):
-        d = replay_buffer.get_all()
-        print("# samples stored", replay_buffer.num_stored)
-        tup = d.astuple() # self.obs, self.act, self.next_obs, self.rewards, self.dones
-        observations = np.array(tup[0])
-        actions = np.array(tup[1])
-        dones = np.array(tup[-1])
-
-        #print(observations.shape)
-        #print(dones.shape)
-        #print(actions.shape)
-
-        trajectory_splits = np.where(dones)[0] + 1
-        trajectories = np.split(observations, trajectory_splits[:-1])
-        u = np.split(actions, trajectory_splits[:-1])
-
-        total_steps = 0
-        # Print the individual trajectories
-        #print('# of different trajectories: ', len(trajectories))
-        trajectories_list = []
-        action_list = []
-        for i, (traj, act_seq) in enumerate(zip(trajectories,u)):
-            #print(f'Trajectory {i + 1}:')
-            total_steps += traj.shape[0]
-            #if traj.shape[0] >0:
-            #    trajectories_list.append(traj)
-            #    action_list.append(act_seq)
-            #print(traj.shape, act_seq.shape)
-            #print()
-        print('total steps: ', total_steps)
-
-        # Convert the NumPy array of arrays to a list of arrays
-        trajectories_list = [traj for traj in trajectories]
-        action_list = [a for a in u]
-        return trajectories_list, action_list
 
 class CartpoleModel():
     def __init__(self, 
@@ -58,7 +23,7 @@ class CartpoleModel():
                 masspole = 0.1,
                 length = 0.5,       # actually half the pole's length
                 force_mag = 10.0,
-                tau = 0.02,         # seconds between state updates
+                tau = 1, #0.02,         # seconds between state updates
                 kinematics_integrator = 'euler'):
                 
         self.gravity = gravity
@@ -74,13 +39,12 @@ class CartpoleModel():
 
     def predict(self, state, action):
         '''
-        returns the state
+        returns delta on the state
         '''
 
 
         x, x_dot, theta, theta_dot = state[..., 0:1], state[...,1:2], state[...,2:3], state[...,3:4]
-        #force = (action*(action==1)*self.force_mag - action*(action!=1)*self.force_mag).unsqueeze(-1)
-        force = action * self.force_mag
+        force = (action*(action==1)*self.force_mag - action*(action!=1)*self.force_mag).unsqueeze(-1)
         # print('force', force.shape)
         # print('action', action.shape)
         # print('state', state.shape)
@@ -88,7 +52,7 @@ class CartpoleModel():
         costheta = torch.cos(theta)
         sintheta = torch.sin(theta)
         temp = (
-            force.reshape(theta_dot.shape) + self.polemass_length * theta_dot ** 2 * sintheta
+            force + self.polemass_length * theta_dot ** 2 * sintheta
         ) / self.total_mass
         thetaacc = (self.gravity * sintheta - costheta * temp) / (
             self.length * (4.0 / 3.0 - self.masspole * costheta ** 2 / self.total_mass)
@@ -97,26 +61,18 @@ class CartpoleModel():
 
         if self.kinematics_integrator == "euler":
             dx = self.tau * x_dot
-            
             dx_dot = self.tau * xacc
             d_theta = self.tau * theta_dot
             d_theta_dot = self.tau * thetaacc
-
-
-            x = (x + dx).reshape(x.shape)
-            x_dot = (x_dot + dx_dot).reshape(x_dot.shape)
-            theta = (theta + d_theta).reshape(theta.shape)
-            theta_dot = (theta_dot + d_theta_dot).reshape(theta_dot.shape)
-            self.state = torch.cat((x, x_dot, theta, theta_dot), dim = -1)
         else:  # semi-implicit euler
             x_dot = x_dot + self.tau * xacc
             x = x + self.tau * x_dot
             theta_dot = theta_dot + self.tau * thetaacc
             theta = theta + self.tau * theta_dot
 
-        #self.dstate = torch.cat((dx, dx_dot, d_theta, d_theta_dot), dim = -1)
+        self.dstate = torch.cat((dx, dx_dot, d_theta, d_theta_dot), dim = -1)
 
-        return self.state
+        return self.dstate
     
 
 class SINDyModel():
@@ -125,7 +81,7 @@ class SINDyModel():
     
     '''
     def __init__(self, 
-                    sparsity_threshold = 0.1, 
+                    sparsity_threshold = 0.01, 
                     der = ps.SmoothedFiniteDifference(),
                     functions = [lambda x : 1, 
                                  lambda x : x, 
@@ -146,12 +102,58 @@ class SINDyModel():
                               optimizer=self.optimizer)
         self.print_model = print_model
 
-    def train(self, replay_buffer):
-        trajectories_list, action_list  = trajectories_from_replay_buffer(replay_buffer)
+    def extract_data_from_buffer(self, replay_buffer_test):
+        d = replay_buffer_test.get_all()
+        #print("# samples stored", replay_buffer_test.num_stored)
+        tup = d.astuple() # self.obs, self.act, self.next_obs, self.rewards, self.dones
+        observations = np.array(tup[0])
+        actions = np.array(tup[1])
+        dones = np.array(tup[-1])
 
-        #self.model.fit(trajectories_list[:-3],u=action_list[:-3], multiple_trajectories=True)
-        self.model.fit(trajectories_list,u=action_list, multiple_trajectories=True)
+        #print(observations.shape)
+        #print(dones.shape)
+        #print(actions.shape)
+
+        trajectory_splits = np.where(dones)[0] + 1
+        trajectories = np.split(observations, trajectory_splits)
+        u = np.split(actions, trajectory_splits)
+
+        total_steps = 0
+        # Print the individual trajectories
+        #print('# of different trajectories: ', len(trajectories))
+        for i, (traj, act_seq) in enumerate(zip(trajectories,u)):
+            #print(f'Trajectory {i + 1}:')
+            total_steps += traj.shape[0]
+            #print(traj.shape, act_seq.shape)
+            #print()
+        #print('total steps: ', total_steps)
+
+        # Convert the NumPy array of arrays to a list of arrays
+        trajectories_list = [traj for traj in trajectories]
+        action_list = [a for a in u]
+
+        return trajectories_list, action_list
+
+
+    def train(self, replay_buffer, num_trails = None):
+
+        m  = ps.SINDy(discrete_time=True, 
+                              feature_library=self.lib, 
+                              differentiation_method=self.der,
+                              optimizer=self.optimizer)
+
+        trajectories_list, action_list = self.extract_data_from_buffer(replay_buffer)
+        if num_trails is not None: 
+            trajectories_list = trajectories_list[:num_trails]
+            action_list = action_list[:num_trails]# this is for measuring sindy lengths
+
+        print('training trajecotries: ', len(trajectories_list), num_trails)
+
+
+        m.fit(trajectories_list,u=action_list, multiple_trajectories=True)
+        self.model = m
         
+        self.print_model=False
         if self.print_model:
             self.model.print()
         
