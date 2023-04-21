@@ -37,7 +37,7 @@ reward_fn = reward_fns.cartpole
 term_fn = termination_fns.cartpole
 
 trial_length = 200
-num_trials = 10
+num_trials = 1
 ensemble_size = 5
 rendering = False
 
@@ -106,7 +106,7 @@ cfg = omegaconf.OmegaConf.create(cfg_dict)
 
 # Create a 1-D dynamics model for this environment
 dynamics_model = common_util.create_one_dim_tr_model(cfg, obs_shape, act_shape)
-dynamics_model.model.physics_model = CartpoleModel()  # CartpoleModel() #SINDyModel() #None #CartpoleModel() #SINDyModel()
+dynamics_model.model.physics_model = SINDyModel()  # CartpoleModel() #SINDyModel() #None #CartpoleModel() #SINDyModel()
 dynamics_model.model.phys_nn_config = phys_nn_config
 
 # Create a gym-like environment to encapsulate the model

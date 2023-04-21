@@ -1,9 +1,13 @@
 import torch
 import math
-
+import time
 import numpy as np
 import pysindy as ps
 import matplotlib.pyplot as plt
+
+from dask import delayed
+import dask.bag as db
+
 # class PhysicsModel():
 
 #     def __init__(self) -> None:
@@ -152,20 +156,36 @@ class SINDyModel():
             self.model.print()
         
     
-    def predict(self, state, action, num_steps = 1, plot = False, overflow_cap = 1e6):
-        
-        action = action.unsqueeze(-1)
-        action_tmp = action.cpu().numpy().reshape(-1, action.shape[-1])
-        state_temp = state.cpu().numpy().reshape(-1, state.shape[-1])
+    def predict(self, state, action, num_steps = 1, plot = False, overflow_clipp = 1e6):
 
-        rollouts = np.array([self.model.simulate(state_i, num_steps + 1, u=action_i)[1:] for state_i, action_i in zip(state_temp, action_tmp)]) 
-        rollouts = rollouts.reshape(state.shape)
+        state_np = state.cpu().numpy().reshape(-1, state.shape[-1])
+        batch_size = state_np.shape[0]
+
+        action_np = action.cpu().numpy().reshape(batch_size,-1)
+        t0 = time.time()
+        #rollouts = np.array([self.model.simulate(state_i, num_steps + 1, u=action_i)[1:] for state_i, action_i in zip(state_temp, action_tmp)]) 
+        #rollouts = rollouts.reshape(state.shape)
+
+        if batch_size>1:
+            multiple_trjectories = True
+            state_np = state_np[:, np.newaxis, :]
+            action_np = action_np[:, np.newaxis, :]
+        else:
+            multiple_trjectories = False
+
+        #def f(u, x):
+        dx = np.array(self.model.predict(state_np, u=action_np, multiple_trajectories= multiple_trjectories))
+        #    return dx
         
+        #delayed_f = delayed(f)
+        #dx = da.map()
         # rollouts0 = np.array([self.model.simulate(state_i, num_steps + 1, u=action_i)[:1] for state_i, action_i in zip(state_temp, action_tmp)]) 
         # rollouts0 = rollouts0.reshape(state.shape)
-
-        if overflow_cap:
-            rollouts[np.abs(rollouts) >overflow_cap] = overflow_cap
+        # if overflow_cap:
+        #     rollouts[np.abs(rollouts) >overflow_cap] = overflow_cap
+        ts = time.time() - t0
+        print(batch_size)
+        print('Sindy simulation time: ', ts)
 
         # if len(rollouts.shape) > 1: 
         #     print(rollouts.reshape(-1, 4)[0, :])
@@ -188,8 +208,8 @@ class SINDyModel():
                 plt.legend()
             plt.show()
 
-
-        return torch.from_numpy(rollouts).float().to(state.device)
+        new_state = torch.from_numpy(dx.reshape(state.shape)).float().to(state.device)
+        return new_state
 
 
 
