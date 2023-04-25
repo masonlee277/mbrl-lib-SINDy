@@ -21,7 +21,7 @@ from REAI.physics_models import SINDyModel, CartpoleModel
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 seed = 0
-env = cartpole_env.CartPoleEnv()
+env = cartpole_env.CartPoleEnv(track_friction=.1, joint_friction=.1)
 env.seed(seed)
 rng = np.random.default_rng(seed=0)
 generator = torch.Generator(device=device)
@@ -90,7 +90,7 @@ cfg_dict = {
 # phys_nn_config = 3
 # only physics model
 
-phys_nn_config = 3
+phys_nn_config = 2
 
 if phys_nn_config == 2:
     cfg_dict["dynamics_model"]["in_features"] = 2 * obs_shape[0] + (
