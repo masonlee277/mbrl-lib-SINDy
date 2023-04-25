@@ -214,7 +214,6 @@ if __name__ == "__main__":
     train_losses = []
     val_scores = []
 
-
     def train_callback(_model, _total_calls, _epoch, tr_loss, val_score, _best_val):
         train_losses.append(tr_loss)
         val_scores.append(
@@ -292,17 +291,8 @@ if __name__ == "__main__":
                     shuffle_each_epoch=True,
                     bootstrap_permutes=False,  # build bootstrap dataset using sampling with replacement
                 )
-
-                # local version of SINDy is updated
-                # sindy = dynamics_model.get_sindy()
-                # sindy.fit(replay_buffer)  # or we train on the entire data
-
-                # SINDy loss is recorded in forward pass
-                # dynamics_model.set_sindy(sindy)
-
-                # SINDy loss is recorded in forward pass
-                # dynamics_model.set_sindy(sindy)
-
+                
+                #Train the model (don't if only using physics model)
                 if phys_nn_config != 3:
                     model_trainer.train(
                         dataset_train,
@@ -312,7 +302,8 @@ if __name__ == "__main__":
                         callback=train_callback,
                         silent=False,
                     )
-
+            
+            # Train SINDy model outside of gradient step, it is not differentiable
             if isinstance(dynamics_model.model.physics_model, SINDyModel):
                 dynamics_model.model.physics_model.train(replay_buffer)
 
@@ -320,6 +311,7 @@ if __name__ == "__main__":
             next_obs, reward, done, _ = common_util.step_env_and_add_to_buffer(
                 env, obs, agent, {}, replay_buffer
             )
+
 
             if rendering:
                 update_axes(

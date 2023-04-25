@@ -183,8 +183,6 @@ class SINDyModel():
             action_list = action_list[:num_trails]# this is for measuring sindy lengths
 
         print('training trajecotries: ', len(trajectories_list), num_trails)
-
-
         m.fit(trajectories_list,u=action_list, multiple_trajectories=True)
         self.model = m
         
@@ -192,7 +190,35 @@ class SINDyModel():
         if self.print_model:
             self.model.print()
         
+    def simulate(self, inital_state, action_list, num_steps):
+        sim = self.model.simulate(inital_state, num_steps, u = action_list)
+        #print(sim.shape)
+        return sim #should be (num_steps, state_space)
     
+    def simulate_with_noise(self, initial_state, action_list, num_steps, noise_std):
+        current_state = initial_state
+        states = [initial_state]
+        actions = action_list if len(action_list) == num_steps else action_list[:num_steps]
+
+        for i in range(num_steps-1):
+            # Simulate the next state using the model
+            next_state = self.simulate(current_state, actions[i], 2)[-1, :]
+            #print(next_state.shape)
+            #print(current_state,actions[i],next_state)
+
+            #print(np.shape(next_state))
+            # Add noise to the next state
+            next_state_with_noise = next_state + np.random.normal(0, noise_std, next_state.shape)
+
+            # Update the current state and store the noisy state
+            current_state = np.squeeze(next_state_with_noise)
+            #print(i, np.shape(current_state))
+            states.append(current_state)
+
+       # print('shape of predicted_states: ', np.shape(states))
+        return np.array(states)
+
+
     def predict(self, state, action, num_steps = 1, plot = False, overflow_clipp = 1e6, run_with_dask = True):
 
         state_np = state.cpu().numpy().reshape(-1, state.shape[-1])
@@ -224,7 +250,7 @@ class SINDyModel():
                 multiple_trjectories = False
 
 
-            dx = self.model.predict(x, u=u, multiple_trajectories= multiple_trjectories)
+            dx = self.model.predict(x, u=u, multiple_trajectories=multiple_trjectories)
             #convert to array and replace inf with 1e6
             dx = np.array(dx, dtype=np.float32)
             dx[dx>overflow_clipp] = overflow_clipp
@@ -248,8 +274,6 @@ class SINDyModel():
 
         #dx = self.model.predict(state_np, u=action_np, multiple_trajectories= multiple_trjectories)
         #convert to array and replace inf with 1e6
-
-
         #    return dx
         
         #delayed_f = delayed(f)
@@ -273,7 +297,6 @@ class SINDyModel():
 
         if plot:
             nftrs = state.shape[-1]
-
             plt.figure()
             for i in range(nftrs):
                 plt.subplot(nftrs,1, i+1)
@@ -282,6 +305,7 @@ class SINDyModel():
                 plt.legend()
             plt.show()
 
+        new_state = state+dx
         new_state = torch.from_numpy(dx.reshape(state.shape)).float().to(state.device)
         return new_state
 

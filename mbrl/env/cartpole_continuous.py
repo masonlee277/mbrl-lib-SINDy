@@ -149,7 +149,7 @@ class CartPoleEnv(gym.Env):
             print('Termination Due to Out of Bounds')
             done = True
         elif theta < -self.theta_threshold_radians or theta > self.theta_threshold_radians:
-            print('Termination Due to Falling too Far')
+            #print('Termination Due to Falling too Far')
             done = True
         else:
             done = False
