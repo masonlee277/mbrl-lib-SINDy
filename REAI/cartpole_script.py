@@ -39,9 +39,9 @@ if __name__ == "__main__":
     term_fn = termination_fns.cartpole
 
     trial_length = 200
-    num_trials = 1
+    num_trials = 10
     ensemble_size = 5
-    rendering = False
+    rendering = True
 
     # Everything with "???" indicates an option with a missing value.
     # Our utility functions will fill in these details using the
@@ -108,7 +108,9 @@ if __name__ == "__main__":
 
     # Create a 1-D dynamics model for this environment
     dynamics_model = common_util.create_one_dim_tr_model(cfg, obs_shape, act_shape)
-    dynamics_model.model.physics_model = SINDyModel()  # CartpoleModel() #SINDyModel() #None #CartpoleModel() #SINDyModel()
+    dynamics_model.model.physics_model = SINDyModel(backend='torch') # change backend to 'torch' to run on GPU
+    
+     # CartpoleModel() 
     dynamics_model.model.phys_nn_config = phys_nn_config
 
     # Create a gym-like environment to encapsulate the model
@@ -130,6 +132,7 @@ if __name__ == "__main__":
     # pretrain Sindy model on random trajectories
     if isinstance(dynamics_model.model.physics_model, SINDyModel):
         dynamics_model.model.physics_model.train(replay_buffer)
+
 
 
     #check physics model
@@ -163,13 +166,14 @@ if __name__ == "__main__":
             plt.plot( predicted_states[:-1, j] ,  label='model prediction from state')
             plt.plot( predicted_states_own[:-1, j] ,  label='model prediction recursive')        
             plt.plot( test_trajectory[1:, j],  label='true trajectory')
+            if j== state_dims - 1:
+                plt.legend()
 
 
             plt.subplot(state_dims, 2, 2 *j + 2)
             plt.plot( np.abs(predicted_states[:-1, j] - test_trajectory[1:, j])  ,  label='model prediction from state')
             plt.plot( np.abs(predicted_states_own[:-1, j]- test_trajectory[1:, j]) ,  label='model prediction recursive')        
             plt.title('Errors')
-        plt.legend()
         plt.show()
 
     check_physics_model(replay_buffer)
@@ -190,19 +194,20 @@ if __name__ == "__main__":
             "action_ub": "???",
             # this is the optimizer to generate and choose a trajectory
             "optimizer_cfg": {
-                "_target_": "mbrl.planning.ICEMOptimizer",
+                "_target_": "mbrl.planning.CEMOptimizer",
                 "num_iterations": 5,
                 "elite_ratio": 0.1,
-                "population_size": 100,
-                "population_decay_factor":  0.9, 
-                "colored_noise_exponent": 0.5,
-                "keep_elite_frac" : 0.1,
+                "population_size": 500,
                 "alpha": 0.1,
                 "device": device,
                 "lower_bound": "???",
                 "upper_bound": "???",
                 "return_mean_elites": True,
-                #"clipped_normal": False,
+                "clipped_normal": False,
+                #for iCEM
+                #"keep_elite_frac" : 0.1,
+                #"population_decay_factor":  0.9, 
+                #"colored_noise_exponent": 0.5,
             },
         }
     )
@@ -240,9 +245,6 @@ if __name__ == "__main__":
         display.clear_output(wait=True)
 
 
-    import numpy as np
-    import math
-
     a = np.array(np.arange(45).reshape(5, 3, 3))
     # c,d,e,f = a[:-1]
     # print(c,d,e,f)
@@ -261,7 +263,7 @@ if __name__ == "__main__":
 
     # Main PETS loop
     all_rewards = [0]
-    for trial in range(5):
+    for trial in range(num_trials):
         obs = env.reset()
         agent.reset()
 
@@ -330,6 +332,9 @@ if __name__ == "__main__":
 
             if steps_trial == trial_length:
                 break
+        
+        if isinstance(dynamics_model.model.physics_model, SINDyModel):
+            dynamics_model.model.physics_model.train(replay_buffer)
 
         all_rewards.append(total_reward)
         print("Total reward:", total_reward)
