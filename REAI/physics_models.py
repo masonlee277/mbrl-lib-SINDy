@@ -288,8 +288,6 @@ class SINDyModel():
         action: torch tensor of shape (batch_size, action_dim)
         num_steps: number of steps to predict
         backend: 'torch' or 'sindy' or 'dask', default 'torch'
-
-
         returns:
         next state prediction
         '''
@@ -348,30 +346,4 @@ class SINDyModel():
         ts = time.time() - t0
         #print('Sindy simulation time: ', ts)
 
-        # if len(rollouts.shape) > 1: 
-        #     print(rollouts.reshape(-1, 4)[0, :])
-        #     print(rollouts0.reshape(-1, 4)[0, :])
-        #     print(state.reshape(-1, 4)[0, :]) 
-        # else:
-
-        #     print(rollouts)
-        #     print(rollouts0)
-        #     print(state)
-
-        if plot:
-            nftrs = state.shape[-1]
-
-            plt.figure()
-            for i in range(nftrs):
-                plt.subplot(nftrs,1, i+1)
-                plt.plot(rollouts[0,:, i], label = 'SINDy')
-                plt.plot(state[0, :,  i], '-o', label = 'true')
-                plt.legend()
-            plt.show()
-
-        new_state = torch.from_numpy(dx.reshape(state.shape)).float().to(state.device)
-        return new_state
-
-
-
-
+        return dx.reshape(state.shape) + state
