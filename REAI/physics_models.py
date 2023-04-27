@@ -15,40 +15,40 @@ import matplotlib.pyplot as plt
 #         raise NotImplementedError
 
 def trajectories_from_replay_buffer(replay_buffer):
-        d = replay_buffer.get_all()
-        print("# samples stored", replay_buffer.num_stored)
-        tup = d.astuple() # self.obs, self.act, self.next_obs, self.rewards, self.dones
-        observations = np.array(tup[0])
-        actions = np.array(tup[1])
-        dones = np.array(tup[-1])
+    d = replay_buffer.get_all()
+    print("# samples stored", replay_buffer.num_stored)
+    tup = d.astuple() # self.obs, self.act, self.next_obs, self.rewards, self.dones
+    observations = np.array(tup[0])
+    actions = np.array(tup[1])
+    dones = np.array(tup[-1])
 
-        #print(observations.shape)
-        #print(dones.shape)
-        #print(actions.shape)
+    #print(observations.shape)
+    #print(dones.shape)
+    #print(actions.shape)
 
-        trajectory_splits = np.where(dones)[0] + 1
-        trajectories = np.split(observations, trajectory_splits[:-1])
-        u = np.split(actions, trajectory_splits[:-1])
+    trajectory_splits = np.where(dones)[0] + 1
+    trajectories = np.split(observations, trajectory_splits[:-1])
+    u = np.split(actions, trajectory_splits[:-1])
 
-        total_steps = 0
-        # Print the individual trajectories
-        #print('# of different trajectories: ', len(trajectories))
-        trajectories_list = []
-        action_list = []
-        for i, (traj, act_seq) in enumerate(zip(trajectories,u)):
-            #print(f'Trajectory {i + 1}:')
-            total_steps += traj.shape[0]
-            #if traj.shape[0] >0:
-            #    trajectories_list.append(traj)
-            #    action_list.append(act_seq)
-            #print(traj.shape, act_seq.shape)
-            #print()
-        print('total steps: ', total_steps)
+    total_steps = 0
+    # Print the individual trajectories
+    #print('# of different trajectories: ', len(trajectories))
+    trajectories_list = []
+    action_list = []
+    for i, (traj, act_seq) in enumerate(zip(trajectories,u)):
+        #print(f'Trajectory {i + 1}:')
+        total_steps += traj.shape[0]
+        #if traj.shape[0] >0:
+        #    trajectories_list.append(traj)
+        #    action_list.append(act_seq)
+        #print(traj.shape, act_seq.shape)
+        #print()
+    print('total steps: ', total_steps)
 
-        # Convert the NumPy array of arrays to a list of arrays
-        trajectories_list = [traj for traj in trajectories]
-        action_list = [a for a in u]
-        return trajectories_list, action_list
+    # Convert the NumPy array of arrays to a list of arrays
+    trajectories_list = [traj for traj in trajectories]
+    action_list = [a for a in u]
+    return trajectories_list, action_list
 
 class CartpoleModel():
     def __init__(self, 
@@ -58,7 +58,9 @@ class CartpoleModel():
                 length = 0.5,       # actually half the pole's length
                 force_mag = 10.0,
                 tau = 0.02,         # seconds between state updates
-                kinematics_integrator = 'euler'):
+                kinematics_integrator = 'euler', 
+                noise_level = 0, 
+                **kwargs ):
                 
         self.gravity = gravity
         self.masscart = masscart
@@ -69,7 +71,7 @@ class CartpoleModel():
         self.force_mag = force_mag
         self.tau =  tau
         self.kinematics_integrator = kinematics_integrator
-
+        self.noise_level = noise_level
 
     def predict(self, state, action):
         '''
@@ -112,6 +114,10 @@ class CartpoleModel():
             theta = theta + self.tau * theta_dot
             state = torch.cat((x, x_dot, theta, theta_dot), dim = -1)
 
+        if self.noise_level > 0:
+            noise = torch.randn(state.shape) * self.noise_level
+            state = state + noise.to(state.device) 
+
         return state
     
 
@@ -139,8 +145,9 @@ class SINDyModel():
                                  lambda x: np.sin(x), 
                                  lambda x : np.cos(x)],        
                     print_model = False, 
-                    backend = 'torch'
-                    ):
+                    backend = 'torch',
+                    noise_level = 0,
+                    **kwargs):
         
 
 
@@ -166,6 +173,7 @@ class SINDyModel():
         self.print_model = print_model
 
         self.backend = backend
+        self.noise_level = noise_level
 
     def extract_data_from_buffer(self, replay_buffer_test):
         d = replay_buffer_test.get_all()
@@ -288,6 +296,8 @@ class SINDyModel():
         action: torch tensor of shape (batch_size, action_dim)
         num_steps: number of steps to predict
         backend: 'torch' or 'sindy' or 'dask', default 'torch'
+
+
         returns:
         next state prediction
         '''
@@ -345,5 +355,12 @@ class SINDyModel():
 
         ts = time.time() - t0
         #print('Sindy simulation time: ', ts)
+        newstate = dx.reshape(state.shape) + state
+   
+        if self.noise_level > 0:
+            noise = torch.randn(state.shape) * self.noise_level
+            newstate = newstate + noise.to(state.device)
+    
+        return newstate
 
-        return dx.reshape(state.shape) + state
+
