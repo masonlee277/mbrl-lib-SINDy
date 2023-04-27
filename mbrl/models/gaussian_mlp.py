@@ -86,7 +86,7 @@ class GaussianMLP(Ensemble):
         in_features: Optional[int] = None,
         #physics_dim: (for SINDy model)
         #SINDy model: 
-        sindy_call_count:int  = 0
+        #sindy_call_count:int  = 0
 
     ):
         super().__init__(
@@ -96,7 +96,7 @@ class GaussianMLP(Ensemble):
         self.phys_nn_config = None
         self.in_size = in_size
         self.out_size = out_size
-        self.sindy_call_count = 0
+        #self.sindy_call_count = 0
 
         if in_features is None:
             in_features = in_size
@@ -259,7 +259,6 @@ class GaussianMLP(Ensemble):
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
             state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
-            #self.sindy_call_count+=1
 
             mean = mean_phys
             logvar = None
