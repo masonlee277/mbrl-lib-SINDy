@@ -60,6 +60,7 @@ class CartpoleModel():
                 tau = 0.02,         # seconds between state updates
                 kinematics_integrator = 'euler', 
                 noise_level = 0, 
+                predit_delta = False,
                 **kwargs ):
                 
         self.gravity = gravity
@@ -72,6 +73,7 @@ class CartpoleModel():
         self.tau =  tau
         self.kinematics_integrator = kinematics_integrator
         self.noise_level = noise_level
+        self.predict_delta = predit_delta
 
     def predict(self, state, action):
         '''
@@ -100,23 +102,34 @@ class CartpoleModel():
             d_theta = self.tau * theta_dot
             d_theta_dot = self.tau * thetaacc
 
-            x = (x + dx).reshape(x.shape)
-            x_dot = (x_dot + dx_dot).reshape(x_dot.shape)
-            theta = (theta + d_theta).reshape(theta.shape)
-            theta_dot = (theta_dot + d_theta_dot).reshape(theta_dot.shape)
-            state = torch.cat((x, x_dot, theta, theta_dot), dim = -1)
 
+            if not self.predict_delta:
+                x = (x + dx).reshape(x.shape)
+                x_dot = (x_dot + dx_dot).reshape(x_dot.shape)
+                theta = (theta + d_theta).reshape(theta.shape)
+                theta_dot = (theta_dot + d_theta_dot).reshape(theta_dot.shape)
+                output = torch.cat((x, x_dot, theta, theta_dot), dim = -1)
+            else:
+
+                dx = (dx).reshape(x.shape)
+                dx_dot = (dx_dot).reshape(x_dot.shape)
+                dtheta = (d_theta).reshape(theta.shape)
+                dtheta_dot = (d_theta_dot).reshape(theta_dot.shape)
+                output = torch.cat((dx, dx_dot, dtheta, dtheta_dot), dim = -1)
         # semi-implicit euler
-        else:  
-            x_dot = x_dot + self.tau * xacc
-            x = x + self.tau * x_dot
-            theta_dot = theta_dot + self.tau * thetaacc
-            theta = theta + self.tau * theta_dot
-            state = torch.cat((x, x_dot, theta, theta_dot), dim = -1)
+        # else:  
+        #     x_dot = x_dot + self.tau * xacc
+        #     x = x + self.tau * x_dot
+        #     theta_dot = theta_dot + self.tau * thetaacc
+        #     theta = theta + self.tau * theta_dot
+        #     state = torch.cat((x, x_dot, theta, theta_dot), dim = -1)
 
         if self.noise_level > 0:
             noise = torch.randn(state.shape) * self.noise_level
             state = state + noise.to(state.device) 
+
+
+
 
         return state
     
@@ -147,6 +160,7 @@ class SINDyModel():
                     print_model = False, 
                     backend = 'torch',
                     noise_level = 0,
+                    predict_delta = False,
                     **kwargs):
         
 
@@ -174,6 +188,7 @@ class SINDyModel():
 
         self.backend = backend
         self.noise_level = noise_level
+        self.predict_delta = predict_delta
 
     def extract_data_from_buffer(self, replay_buffer_test):
         d = replay_buffer_test.get_all()
@@ -355,13 +370,20 @@ class SINDyModel():
 
         ts = time.time() - t0
         #print('Sindy simulation time: ', ts)
-        newstate = dx.reshape(state.shape) + state
-   
+
+        if self.predict_delta:
+            output = dx.reshape(state.shape)
+
+        else:
+            output = dx.reshape(state.shape) + state
+
+
+
         if self.noise_level > 0:
             noise = torch.randn(state.shape) * self.noise_level
-            newstate = newstate + noise.to(state.device)
+            output = output + noise.to(state.device)
     
-        return newstate
+        return output
 
 
 
