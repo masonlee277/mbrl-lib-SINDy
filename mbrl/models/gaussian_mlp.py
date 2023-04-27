@@ -201,15 +201,12 @@ class GaussianMLP(Ensemble):
 
     #         return self.state
 
-    def print_something():
-        print('defualt forward call')
-
+ 
     def _default_forward(
         self, x: torch.Tensor, only_elite: bool = False, **_kwargs
             ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         self._maybe_toggle_layers_use_only_elite(only_elite)
 
-        def print_something()
         if self.phys_nn_config ==0: # only PETS
             xf = self.hidden_layers(x) 
             mean_and_logvar = self.mean_and_logvar(xf)
