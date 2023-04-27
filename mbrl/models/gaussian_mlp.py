@@ -204,7 +204,21 @@ class GaussianMLP(Ensemble):
             ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         self._maybe_toggle_layers_use_only_elite(only_elite)
 
+        if self.physics_model is not None:
 
+            normalizer = self.physics_model.input_normalizer
+            mean_n = normalizer.mean
+            std_n = normalizer.std
+            if len(x.shape)==3:
+                mean_n = mean_n.unsqueeze(0)
+                std_n = std_n.unsqueeze(0)
+                
+
+            x_unnormalized = x * std_n + mean_n
+            state, action = x_unnormalized[...,:-1], x_unnormalized[...,-1]
+
+
+        
         if self.phys_nn_config ==0: # only PETS
             xf = self.hidden_layers(x) 
             mean_and_logvar = self.mean_and_logvar(xf)
@@ -222,9 +236,10 @@ class GaussianMLP(Ensemble):
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
 
             # phys model
-            state, action = x[...,:-1], x[...,-1]
+            #state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
-
+            mean_phys_normalized = (mean_phys - mean_n[..., :-1]) / std_n[..., :-1]
+            mean_phys  = mean_phys_normalized
             # NN 
             xf = self.hidden_layers(x) 
             mean_and_logvar = self.mean_and_logvar(xf)
@@ -236,11 +251,12 @@ class GaussianMLP(Ensemble):
 
         elif self.phys_nn_config ==2: # phys_model to  NN
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
-            state, action = x[...,:-1], x[...,-1]
+            #state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
-
+            mean_phys_normalized = (mean_phys - mean_n[..., :-1]) / std_n[..., :-1]
+            mean_phys  = mean_phys_normalized
             #pass prediction through NN
-            xin = torch.cat((mean_phys, state, action.unsqueeze(-1)), dim=-1)        
+            xin = torch.cat((mean_phys, x), dim=-1)        
             xf = self.hidden_layers(xin) #passing through hidden layers shape []
             mean_and_logvar = self.mean_and_logvar(xf)
 
@@ -249,9 +265,10 @@ class GaussianMLP(Ensemble):
 
         elif self.phys_nn_config ==3: # only phys_model
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
-            state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
-
+            mean_phys_normalized = (mean_phys - mean_n[..., :-1]) / std_n[..., :-1]
+            mean_phys  = mean_phys_normalized
+            
             mean = mean_phys
             logvar = None
             #logvar = mean_and_logvar[..., self.out_size :]

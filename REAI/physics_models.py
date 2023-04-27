@@ -74,7 +74,7 @@ class CartpoleModel():
         self.kinematics_integrator = kinematics_integrator
         self.noise_level = noise_level
         self.predict_delta = predit_delta
-
+        self.inputs_normalizer = None
     def predict(self, state, action):
         '''
         returns the next state prediction
@@ -189,6 +189,7 @@ class SINDyModel():
         self.backend = backend
         self.noise_level = noise_level
         self.predict_delta = predict_delta
+        self.inputs_normalizer = None
 
     def extract_data_from_buffer(self, replay_buffer_test):
         d = replay_buffer_test.get_all()
