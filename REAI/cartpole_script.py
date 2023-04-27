@@ -32,7 +32,7 @@ seed = 0
 
 
 physics_config = {
-    'phys_nn_config' : 2,                   
+    'phys_nn_config' : 1,                   
     # options:  
     # 0: no physics model, only pets
     # 1: additive composition: 
@@ -40,10 +40,11 @@ physics_config = {
     # 2: physics model prediction pass through pets
     #   mean, logvar = NN(concat(physics_model.predict(state, action), state, action)
     #3: only physics model, no NN
-    'physics_model' : 'sindy',               
+    'physics_model' : 'cartpole',               
     # options: sindy/cartpole
-    'model_kwargs' : { 'backend' : 'torch',
-                       'noise_level' : 0.01 } , 
+    'model_kwargs' : { #'backend' : 'torch',
+                       'noise_level' : 0.0 , 
+                       'predict_delta' : False} , 
     # options for sindy: 'backend' : 'torch', 'sindy', 'dask'
 
     }
@@ -71,7 +72,7 @@ cfg_dict = {
     "algorithm": {
         "learned_rewards": False,
         "target_is_delta": True,
-        "normalize": True,
+        "normalize": False,
     },
     # these are experiment specific options
     "overrides": {
@@ -174,7 +175,7 @@ if isinstance(dynamics_model.model.physics_model, SINDyModel):
 
 
 #check physics model
-#check_physics_model(replay_buffer)
+check_physics_model(replay_buffer, dynamics_model.model.physics_model)
 print("num stored", replay_buffer.num_stored)
 print("# samples stored", replay_buffer.num_stored)
 

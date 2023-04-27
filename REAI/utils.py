@@ -31,6 +31,10 @@ def check_physics_model(replay_buffer, physics_model):
     predicted_states = np.array(predicted_states)
     predicted_states_own = np.array(predicted_states_own)
 
+    print(predicted_states)  
+    print(predicted_states_own)
+
+
     plt.figure()
     state_dims = state.shape[0]
     for j in range(state_dims):
@@ -47,3 +51,7 @@ def check_physics_model(replay_buffer, physics_model):
         plt.plot( np.abs(predicted_states_own[:-1, j]- test_trajectory[1:, j]) ,  label='model prediction recursive')        
         plt.title('Errors')
     plt.show()
+
+    
+
+    return predicted_states, predicted_states_own

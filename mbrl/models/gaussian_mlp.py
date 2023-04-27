@@ -86,6 +86,8 @@ class GaussianMLP(Ensemble):
         in_features: Optional[int] = None,
         #physics_dim: (for SINDy model)
         #SINDy model: 
+        sindy_call_count:int  = 0
+
     ):
         super().__init__(
             ensemble_size, device, propagation_method, deterministic=deterministic
@@ -94,11 +96,11 @@ class GaussianMLP(Ensemble):
         self.phys_nn_config = None
         self.in_size = in_size
         self.out_size = out_size
+        self.sindy_call_count = 0
 
         if in_features is None:
             in_features = in_size
         self.in_features = in_features
-        
 
         def create_activation():
             if activation_fn_cfg is None:
@@ -199,12 +201,15 @@ class GaussianMLP(Ensemble):
 
     #         return self.state
 
+    def print_something():
+        print('defualt forward call')
+
     def _default_forward(
         self, x: torch.Tensor, only_elite: bool = False, **_kwargs
             ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         self._maybe_toggle_layers_use_only_elite(only_elite)
 
-
+        def print_something()
         if self.phys_nn_config ==0: # only PETS
             xf = self.hidden_layers(x) 
             mean_and_logvar = self.mean_and_logvar(xf)
@@ -220,10 +225,12 @@ class GaussianMLP(Ensemble):
 
         elif self.phys_nn_config ==1: # add means
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
+            #self.sindy_call_count+=1
 
             # phys model
             state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
+            #print('sindy prediction')
 
             # NN 
             xf = self.hidden_layers(x) 
@@ -238,6 +245,7 @@ class GaussianMLP(Ensemble):
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
             state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
+            self.sindy_call_count+=1
 
             #pass prediction through NN
             xin = torch.cat((mean_phys, state, action.unsqueeze(-1)), dim=-1)        
@@ -251,6 +259,7 @@ class GaussianMLP(Ensemble):
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
             state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
+            #self.sindy_call_count+=1
 
             mean = mean_phys
             logvar = None
@@ -418,6 +427,7 @@ class GaussianMLP(Ensemble):
         # # Concatenate the physics output with the input tensor along dimension 1
         # x = torch.cat((x, physics_output), dim=1)
 
+        print('forward call')
 
         if use_propagation:
             return self._forward_ensemble(
