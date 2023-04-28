@@ -303,6 +303,9 @@ class SINDyModel():
         return dx
 
 
+    def simulate(self, inital_state, action_list, num_steps):
+        return self.model.simulate(inital_state, num_steps, u = action_list)
+
     def predict(self, state,
                  action, overflow_clipp = 1e6):
         
@@ -384,8 +387,5 @@ class SINDyModel():
     
         return output
     
-
-def simulate(self, inital_state, action_list, num_steps):
-        return self.model.simulate(inital_state, num_steps, u = action_list)
 
 

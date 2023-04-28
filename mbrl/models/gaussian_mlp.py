@@ -242,7 +242,7 @@ class GaussianMLP(Ensemble):
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
             state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
-            self.sindy_call_count+=1
+            #self.sindy_call_count+=1
 
             #pass prediction through NN
             xin = torch.cat((mean_phys, state, action.unsqueeze(-1)), dim=-1)        
