@@ -423,7 +423,6 @@ class GaussianMLP(Ensemble):
         # # Concatenate the physics output with the input tensor along dimension 1
         # x = torch.cat((x, physics_output), dim=1)
 
-        print('forward call')
 
         if use_propagation:
             return self._forward_ensemble(
