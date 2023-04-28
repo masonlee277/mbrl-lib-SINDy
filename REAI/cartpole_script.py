@@ -32,7 +32,7 @@ seed = 0
 
 
 physics_config = {
-    'phys_nn_config' : 1,                   
+    'phys_nn_config' : 3,                   
     # options:  
     # 0: no physics model, only pets
     # 1: additive composition: 
@@ -40,7 +40,7 @@ physics_config = {
     # 2: physics model prediction pass through pets
     #   mean, logvar = NN(concat(physics_model.predict(state, action), state, action)
     #3: only physics model, no NN
-    'physics_model' : 'cartpole',               
+    'physics_model' : 'sindy',               
     # options: sindy/cartpole
     'model_kwargs' : { #'backend' : 'torch',
                        'noise_level' : 0.0 , 
@@ -72,7 +72,7 @@ cfg_dict = {
     "algorithm": {
         "learned_rewards": False,
         "target_is_delta": True,
-        "normalize": False,
+        "normalize": True,
     },
     # these are experiment specific options
     "overrides": {
@@ -87,7 +87,7 @@ agent_cfg = omegaconf.OmegaConf.create(
     {
         # this class evaluates many trajectories and picks the best one
         "_target_": "mbrl.planning.TrajectoryOptimizerAgent",
-        "planning_horizon": 15,
+        "planning_horizon": 10,
         "replan_freq": 1,
         "verbose": False,
         "action_lb": "???",
@@ -97,7 +97,7 @@ agent_cfg = omegaconf.OmegaConf.create(
             "_target_": "mbrl.planning.CEMOptimizer",
             "num_iterations": 5,
             "elite_ratio": 0.1,
-            "population_size": 500,
+            "population_size": 1000,
             "alpha": 0.1,
             "device": device,
             "lower_bound": "???",
@@ -131,6 +131,8 @@ term_fn = termination_fns.cartpole
 phys_nn_config = physics_config['phys_nn_config']
 physics_model = physics_config['physics_model']
 
+
+
 if phys_nn_config == 2:
     cfg_dict["dynamics_model"]["in_features"] = 2 * obs_shape[0] + (act_shape[0] if act_shape else 1)
     print('overriding in_features to ', cfg_dict["dynamics_model"]["in_features"])
@@ -145,11 +147,13 @@ cfg = omegaconf.OmegaConf.create(cfg_dict)
 dynamics_model = common_util.create_one_dim_tr_model(cfg, obs_shape, act_shape)
 dynamics_model.model.phys_nn_config = phys_nn_config
 
+
 if physics_model == 'sindy':
     dynamics_model.model.physics_model = SINDyModel(**physics_config['model_kwargs']) # change backend to 'torch' to run on GPU
 
 elif physics_model == 'cartpole':
     dynamics_model.model.physics_model = CartpoleModel(**physics_config['model_kwargs'])
+
 
 
 # Create a gym-like environment to encapsulate the model
@@ -175,7 +179,7 @@ if isinstance(dynamics_model.model.physics_model, SINDyModel):
 
 
 #check physics model
-check_physics_model(replay_buffer, dynamics_model.model.physics_model)
+#check_physics_model(replay_buffer, dynamics_model.model.physics_model)
 print("num stored", replay_buffer.num_stored)
 print("# samples stored", replay_buffer.num_stored)
 
@@ -240,6 +244,8 @@ for trial in range(num_trials):
             dynamics_model.update_normalizer(
                 replay_buffer.get_all()
             )  # update normalizer stats
+
+            dynamics_model.model.physics_model.input_normalizer = dynamics_model.input_normalizer
 
             # bootsrapped
             dataset_train, dataset_val = common_util.get_basic_buffer_iterators(
