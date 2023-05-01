@@ -26,28 +26,39 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 trial_length = 200
 num_trials = 10
-ensemble_size = 5
+ensemble_size = 1
+num_particles = 20
 rendering = True
 seed = 0
 
-
 physics_config = {
     'phys_nn_config' : 3,                   
-    # options:  
-    # 0: no physics model, only pets
-    # 1: additive composition: 
-    #    mean = physics_model(x) + Pets(x), logvar = Pets(x) 
-    # 2: physics model prediction pass through pets
-    #   mean, logvar = NN(concat(physics_model.predict(state, action), state, action)
-    #3: only physics model, no NN
-    'physics_model' : 'sindy',               
-    # options: sindy/cartpole
+        # options:  
+        # 0: no physics model, only pets
+        # 1: additive composition: 
+        #    mean = physics_model(x) + Pets(x), logvar = Pets(x) 
+        # 2: physics model prediction pass through pets
+        #   mean, logvar = NN(concat(physics_model.predict(state, action), state, action)
+        #3: only physics model, no NN
+    'physics_model' : 'cartpole',               
+        # options: sindy/cartpole
+    
     'model_kwargs' : { #'backend' : 'torch',
                        'noise_level' : 0.0 , 
-                       'predict_delta' : False} , 
+                       #'predict_delta' : False
+                       } ,
+                         
     # options for sindy: 'backend' : 'torch', 'sindy', 'dask'
-
     }
+
+
+if physics_config['physics_model'] == 'cartpole':
+    physics_config['model_kwargs']['predict_delta'] = False
+
+elif physics_config['physics_model'] == 'sindy':
+    physics_config['model_kwargs']['predict_delta'] = True
+    print('For sindy')
+
 
 
 # Everything with "???" indicates an option with a missing value.
@@ -89,28 +100,53 @@ agent_cfg = omegaconf.OmegaConf.create(
     {
         # this class evaluates many trajectories and picks the best one
         "_target_": "mbrl.planning.TrajectoryOptimizerAgent",
-        "planning_horizon": 10,
+        "planning_horizon": 15,
         "replan_freq": 1,
         "verbose": False,
         "action_lb": "???",
         "action_ub": "???",
+
         # this is the optimizer to generate and choose a trajectory
+        
+        #CEM
+        # "optimizer_cfg": {
+        #     "_target_": "mbrl.planning.CEMOptimizer",
+        #     "num_iterations": 20,
+        #     "elite_ratio": 0.1,
+        #     "population_size": 1000,
+        #     "alpha": 0.1,
+        #     "device": device,
+        #     "lower_bound": "???",
+        #     "upper_bound": "???",
+        #     "return_mean_elites": True,
+        #     "clipped_normal": True,
+        # },
+        #iCEM
         "optimizer_cfg": {
-            "_target_": "mbrl.planning.CEMOptimizer",
-            "num_iterations": 5,
+            "_target_": "mbrl.planning.ICEMOptimizer",
+            "num_iterations": 20,
             "elite_ratio": 0.1,
-            "population_size": 1000,
+            "population_size": 5000,
             "alpha": 0.1,
             "device": device,
             "lower_bound": "???",
             "upper_bound": "???",
             "return_mean_elites": True,
-            "clipped_normal": False,
-            #for iCEM
-            #"keep_elite_frac" : 0.1,
-            #"population_decay_factor":  0.9, 
-            #"colored_noise_exponent": 0.5,
-        },
+            "keep_elite_frac" : 0.1,
+            "population_decay_factor":  2., 
+            "colored_noise_exponent": 2,}
+        #MPPi
+        # "optimizer_cfg": {
+        #     "_target_": "mbrl.planning.MPPIOptimizer",
+        #     "num_iterations": 5,
+        #     "population_size": 350,
+        #     "gamma" : 0.9, 
+        #     "sigma" : 1.0,
+        #     "beta" : 0.9,
+        #     "lower_bound": "???",
+        #     "upper_bound": "???",
+        #     "device": device,
+        # },
     }
 )
 
@@ -181,12 +217,12 @@ if isinstance(dynamics_model.model.physics_model, SINDyModel):
 
 
 #check physics model
-#check_physics_model(replay_buffer, dynamics_model.model.physics_model)
+check_physics_model(replay_buffer, dynamics_model.model.physics_model)
 print("num stored", replay_buffer.num_stored)
 print("# samples stored", replay_buffer.num_stored)
 
 agent = planning.create_trajectory_optim_agent_for_model(
-    model_env, agent_cfg, num_particles=20
+    model_env, agent_cfg, num_particles=num_particles
 )
 
 train_losses = []
