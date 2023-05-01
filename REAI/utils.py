@@ -48,3 +48,6 @@ def check_physics_model(replay_buffer, physics_model):
         #plt.plot( np.abs(predicted_states_own[:-1, j]- test_trajectory[1:, j]) ,  label='model prediction recursive')        
         plt.title('Errors')
     plt.show()
+
+    
+

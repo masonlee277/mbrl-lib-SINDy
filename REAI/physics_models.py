@@ -296,7 +296,10 @@ class SINDyModel():
         dx_bag = x_bag.map(f, u_bag)
         dx = dx_bag.compute()
         return dx
+    
 
+    def simulate(self, inital_state, action_list, num_steps):
+        return self.model.simulate(inital_state, num_steps, u = action_list)
 
     def predict(self, state,
                  action, overflow_clipp = 1e6):
@@ -314,7 +317,7 @@ class SINDyModel():
         '''
         
         t0 = time.time()
-        
+        self.sindy_calls += 1
 
         if self.backend == 'torch':
             dx = self._predict_with_torch(state, action)
@@ -373,14 +376,11 @@ class SINDyModel():
         else:
             output = dx.reshape(state.shape) + state
 
-
-
         if self.noise_level > 0:
             noise = torch.randn(state.shape) * self.noise_level
             output = output + noise.to(state.device)
     
         return output
-
-
+    
 
 

@@ -63,8 +63,6 @@ elif physics_config['physics_model'] == 'sindy':
 
 # Everything with "???" indicates an option with a missing value.
 # Our utility functions will fill in these details using the
-
-
 cfg_dict = {
     # dynamics model configuration
     "dynamics_model": {
@@ -362,5 +360,3 @@ if not rendering:
     ax.set_ylabel("Trial reward")
     ax.plot(all_rewards, "bs-")
     plt.show()
-
-
