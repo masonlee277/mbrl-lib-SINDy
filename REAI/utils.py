@@ -15,28 +15,29 @@ def check_physics_model(replay_buffer, physics_model):
     test_actions = action_list[1]
 
     predicted_states = []
-    predicted_states_own = []
-    next_state = test_trajectory[0]
+    predict_recursively = []
+    init_state = test_trajectory[0]
     for i in range(len(test_trajectory)):
         state = torch.tensor(test_trajectory[i])
         action = torch.tensor(test_actions[i])
         
         #predicting recursively (from its own prediction)
-        predicted_states_own.append(np.array(physics_model.predict(torch.tensor(next_state), action)))
+        predict_recursively.append(np.array(physics_model.predict(torch.tensor(init_state), action)))
         
         #predicting from actual state
         next_state = np.array(physics_model.predict(state, action))
         predicted_states.append(next_state)
+        init_state = next_state
 
     predicted_states = np.array(predicted_states)
-    predicted_states_own = np.array(predicted_states_own)
+    predict_recursively = np.array(predict_recursively)
 
     plt.figure()
     state_dims = state.shape[0]
     for j in range(state_dims):
         plt.subplot(state_dims, 2, 2*j + 1)
         plt.plot( predicted_states[:-1, j] ,  label='model prediction from state')
-        plt.plot( predicted_states_own[:-1, j] ,  label='model prediction recursive')        
+        plt.plot( predict_recursively[:-1, j] ,  label='model prediction recursive')        
         plt.plot( test_trajectory[1:, j],  label='true trajectory')
         if j== state_dims - 1:
             plt.legend()
@@ -44,6 +45,6 @@ def check_physics_model(replay_buffer, physics_model):
 
         plt.subplot(state_dims, 2, 2 *j + 2)
         plt.plot( np.abs(predicted_states[:-1, j] - test_trajectory[1:, j])  ,  label='model prediction from state')
-        plt.plot( np.abs(predicted_states_own[:-1, j]- test_trajectory[1:, j]) ,  label='model prediction recursive')        
+        #plt.plot( np.abs(predicted_states_own[:-1, j]- test_trajectory[1:, j]) ,  label='model prediction recursive')        
         plt.title('Errors')
     plt.show()
