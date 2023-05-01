@@ -216,7 +216,7 @@ class GaussianMLP(Ensemble):
 
             x_unnormalized = x * std_n + mean_n
             state, action = x_unnormalized[...,:-1], x_unnormalized[...,-1]
-
+            
 
         
         if self.phys_nn_config ==0: # only PETS
@@ -238,8 +238,8 @@ class GaussianMLP(Ensemble):
             # phys model
             #state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action)
-            mean_phys_normalized = (mean_phys - mean_n[..., :-1]) / std_n[..., :-1]
-            mean_phys  = mean_phys_normalized
+            #mean_phys_normalized = (mean_phys - mean_n[..., :-1]) / std_n[..., :-1]
+            #mean_phys  = mean_phys_normalized
             # NN 
             xf = self.hidden_layers(x) 
             mean_and_logvar = self.mean_and_logvar(xf)
@@ -266,9 +266,9 @@ class GaussianMLP(Ensemble):
         elif self.phys_nn_config ==3: # only phys_model
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
             mean_phys = self.physics_model.predict(state, action)
-            mean_phys_normalized = (mean_phys - mean_n[..., :-1]) / std_n[..., :-1]
-            mean_phys  = mean_phys_normalized
-            
+            #mean_phys_normalized = (mean_phys - mean_n[..., :-1]) / std_n[..., :-1]
+            #mean_phys  = mean_phys_normalized
+
             mean = mean_phys
             logvar = None
             #logvar = mean_and_logvar[..., self.out_size :]
