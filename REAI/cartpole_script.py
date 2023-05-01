@@ -45,7 +45,7 @@ physics_config = {
     
     'model_kwargs' : { #'backend' : 'torch',
                        'noise_level' : 0.0 , 
-                       #'predict_delta' : False
+                       'predict_delta' : True
                        } ,
                          
     # options for sindy: 'backend' : 'torch', 'sindy', 'dask'
@@ -296,7 +296,7 @@ for trial in range(num_trials):
                 model_trainer.train(
                     dataset_train,
                     dataset_val=dataset_val,
-                    num_epochs=50,
+                    num_epochs=150,
                     patience=50,
                     callback=train_callback,
                     silent=False,

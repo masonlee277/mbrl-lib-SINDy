@@ -205,8 +205,9 @@ class GaussianMLP(Ensemble):
         self._maybe_toggle_layers_use_only_elite(only_elite)
 
         if self.physics_model is not None:
-
-            normalizer = self.physics_model.input_normalizer
+            
+            #make sure this is input(S)!!
+            normalizer = self.physics_model.inputs_normalizer
             mean_n = normalizer.mean
             std_n = normalizer.std
             if len(x.shape)==3:
