@@ -208,7 +208,7 @@ class GaussianMLP(Ensemble):
             
             #make sure this is input(S)!!
             normalizer = self.physics_model.inputs_normalizer
-            mean_n = normalizer.mean
+            mean_n = normalizer.mean #comment
             std_n = normalizer.std
             if len(x.shape)==3:
                 mean_n = mean_n.unsqueeze(0)

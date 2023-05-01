@@ -317,7 +317,7 @@ class SINDyModel():
         '''
         
         t0 = time.time()
-        self.sindy_calls += 1
+        #self.sindy_calls += 1
 
         if self.backend == 'torch':
             dx = self._predict_with_torch(state, action)
@@ -370,11 +370,13 @@ class SINDyModel():
         ts = time.time() - t0
         #print('Sindy simulation time: ', ts)
 
+        #this is the correct delta prediction
         if self.predict_delta:
-            output = dx.reshape(state.shape)
+            output =  dx.reshape(state.shape) - state
 
+        #output is by default the next-state prediction
         else:
-            output = dx.reshape(state.shape) + state
+            output = dx.reshape(state.shape) #  + state
 
         if self.noise_level > 0:
             noise = torch.randn(state.shape) * self.noise_level

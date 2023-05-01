@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from REAI.physics_models import trajectories_from_replay_buffer
-
+from copy import deepcopy
 
 #check physics model
 def check_physics_model(replay_buffer, physics_model):
@@ -16,18 +16,33 @@ def check_physics_model(replay_buffer, physics_model):
 
     predicted_states = []
     predict_recursively = []
-    init_state = test_trajectory[0]
+    init_state = deepcopy(test_trajectory[0])
+    print('init_state', init_state)
+    if physics_model.predict_delta: print('Predicting delta')
+    else: print('Predicting state')
+
+    cur_state = init_state
     for i in range(len(test_trajectory)):
         state = torch.tensor(test_trajectory[i])
         action = torch.tensor(test_actions[i])
         
+        print(state, init_state)
+        #if i == 0: assert state == init_state, print(state,init_state)
+        
         #predicting recursively (from its own prediction)
-        predict_recursively.append(np.array(physics_model.predict(torch.tensor(init_state), action)))
+        if physics_model.predict_delta:
+            next_state = np.array(physics_model.predict(torch.tensor(cur_state), action) + cur_state)
+        else:
+            next_state = np.array(physics_model.predict(torch.tensor(cur_state), action))
+        predict_recursively.append(next_state)
+        cur_state = next_state
         
         #predicting from actual state
-        next_state = np.array(physics_model.predict(state, action))
-        predicted_states.append(next_state)
-        init_state = next_state
+        if physics_model.predict_delta:
+            pred_state = np.array(physics_model.predict(state, action) + state)
+        else:
+            pred_state = np.array(physics_model.predict(state, action))
+        predicted_states.append(pred_state)
 
     predicted_states = np.array(predicted_states)
     predict_recursively = np.array(predict_recursively)

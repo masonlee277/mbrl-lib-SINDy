@@ -32,7 +32,7 @@ rendering = True
 seed = 0
 
 physics_config = {
-    'phys_nn_config' : 3,                   
+    'phys_nn_config' : 1,                   
         # options:  
         # 0: no physics model, only pets
         # 1: additive composition: 
@@ -40,7 +40,7 @@ physics_config = {
         # 2: physics model prediction pass through pets
         #   mean, logvar = NN(concat(physics_model.predict(state, action), state, action)
         #3: only physics model, no NN
-    'physics_model' : 'cartpole',               
+    'physics_model' : 'sindy',               
         # options: sindy/cartpole
     
     'model_kwargs' : { #'backend' : 'torch',
@@ -53,7 +53,7 @@ physics_config = {
 
 
 if physics_config['physics_model'] == 'cartpole':
-    physics_config['model_kwargs']['predict_delta'] = False
+    physics_config['model_kwargs']['predict_delta'] = True
 
 elif physics_config['physics_model'] == 'sindy':
     physics_config['model_kwargs']['predict_delta'] = True
@@ -281,7 +281,7 @@ for trial in range(num_trials):
                 replay_buffer.get_all()
             )  # update normalizer stats
 
-            dynamics_model.model.physics_model.input_normalizer = dynamics_model.input_normalizer
+            dynamics_model.model.physics_model.inputs_normalizer = dynamics_model.input_normalizer
 
             # bootsrapped
             dataset_train, dataset_val = common_util.get_basic_buffer_iterators(
