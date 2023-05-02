@@ -17,17 +17,11 @@ def check_physics_model(replay_buffer, physics_model):
     predicted_states = []
     predict_recursively = []
     init_state = deepcopy(test_trajectory[0])
-    print('init_state', init_state)
-    if physics_model.predict_delta: print('Predicting delta')
-    else: print('Predicting state')
 
     cur_state = init_state
     for i in range(len(test_trajectory)):
         state = torch.tensor(test_trajectory[i])
         action = torch.tensor(test_actions[i])
-        
-        print(state, init_state)
-        #if i == 0: assert state == init_state, print(state,init_state)
         
         #predicting recursively (from its own prediction)
         if physics_model.predict_delta:
