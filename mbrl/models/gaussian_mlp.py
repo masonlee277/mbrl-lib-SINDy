@@ -253,7 +253,7 @@ class GaussianMLP(Ensemble):
         elif self.phys_nn_config ==2: # phys_model to  NN
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
             #state, action = x[...,:-1], x[...,-1]
-            mean_phys = self.physics_model.predict(state, action)
+            mean_phys = self.physics_model.predict(state, action) + state
             mean_phys_normalized = (mean_phys - mean_n[..., :-1]) / std_n[..., :-1]
             mean_phys  = mean_phys_normalized
             #pass prediction through NN
