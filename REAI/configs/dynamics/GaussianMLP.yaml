@@ -1,0 +1,14 @@
+# @package _group_
+_target_: mbrl.models.GaussianMLP
+device: cuda:0
+num_layers: 3
+ensemble_size: 5
+hid_size: 200
+in_size: ???
+in_features: ???
+out_size: ???
+deterministic: false
+propagation_method: fixed_model
+activation_fn_cfg:
+  _target_: torch.nn.LeakyReLU
+  negative_slope: 0.01
