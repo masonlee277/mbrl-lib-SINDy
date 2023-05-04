@@ -28,7 +28,7 @@ trial_length = 200
 num_trials = 10
 ensemble_size = 1
 num_particles = 20
-rendering = True
+rendering = False
 seed = 0
 
 physics_config = {
@@ -40,7 +40,7 @@ physics_config = {
         # 2: physics model prediction pass through pets
         #   mean, logvar = NN(concat(physics_model.predict(state, action), state, action)
         #3: only physics model, no NN
-    'physics_model' : 'sindy',               
+    'physics_model' : 'cartpole',
         # options: sindy/cartpole
     
     'model_kwargs' : { #'backend' : 'torch',
@@ -148,9 +148,25 @@ agent_cfg = omegaconf.OmegaConf.create(
     }
 )
 
+# Configures the target physics model
+env_cfg = {
+    'gravity': 9.8,
+    'masscart': 1.0,
+    'masspole': 0.1,
+    'length': 0.5,
+    'force_mag': 10.0,
+    'track_friction': 0.0,
+    'joint_friction': 0.0,
+    # Standard deviation on the observation of the states
+    # DOES NOT AFFECT INTERNAL STATE PROPOGATION 
+    # can be scalar or 1-d array
+    # 'obs_noise': [0.003, 0.01, 0.003, 0.01], 
+    'obs_noise': 0.0, 
+}
+
 
 #def run():
-env = cartpole_env.CartPoleEnv()
+env = cartpole_env.CartPoleEnv(**env_cfg)
 env.seed(seed)
 rng = np.random.default_rng(seed=0)
 generator = torch.Generator(device=device)

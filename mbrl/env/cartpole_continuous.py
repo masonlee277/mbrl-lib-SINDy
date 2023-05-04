@@ -21,6 +21,7 @@ class CartPoleEnv(gym.Env):
         force_mag=10.0,
         track_friction=0.0,
         joint_friction=0.0,
+        obs_noise=0.0
     ):
         self.gravity = gravity
         self.masscart = masscart
@@ -29,12 +30,9 @@ class CartPoleEnv(gym.Env):
         self.length = length  # actually half the pole's length
         self.polemass_length = self.masspole * self.length
         self.force_mag = force_mag
-        self.track_friction = (
-            track_friction  # Dynamic coefficient of friction btwn track and cart
-        )
-        self.joint_friction = (
-            joint_friction  # Dynamic coefficient of friction btwn pole and cart
-        )
+        self.track_friction = track_friction  # Dynamic coefficient of friction btwn track and cart
+        self.joint_friction = joint_friction  # Dynamic coefficient of friction btwn pole and cart
+        self.obs_noise = np.array(obs_noise)
         self.tau = 0.02  # seconds between state updates
         self.kinematics_integrator = "euler"
 
@@ -87,51 +85,43 @@ class CartPoleEnv(gym.Env):
         # xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
 
 
-        # temp = (
-        #     force + self.polemass_length * theta_dot**2 * sintheta
-        # ) / self.total_mass
-        # temp2 = (
-        #     -temp
-        #     + self.polemass_length * theta_dot**2 * costheta / self.total_mass
-        #     + friction_coeff * self.gravity
-        # )
-        # thetaacc = (
-        #     self.gravity * sintheta
-        #     + costheta * temp2
-        #     # Join Friction Term
-        #     - self.joint_friction * theta_dot / self.polemass_length
-        # ) / (
-        #     self.length
-        #     * (
-        #         4.0 / 3.0
-        #         - self.masspole
-        #         * costheta
-        #         * (costheta - friction_coeff)
-        #         / self.total_mass
-        #     )
-        # )
+        temp = (
+            force + self.polemass_length * theta_dot**2 * sintheta
+        ) / self.total_mass
+        temp2 = (
+            -temp
+            + self.polemass_length * theta_dot**2 * costheta / self.total_mass
+            + friction_coeff * self.gravity
+        )
+        thetaacc = (
+            self.gravity * sintheta
+            + costheta * temp2
+            # Join Friction Term
+            - self.joint_friction * theta_dot / self.polemass_length
+        ) / (
+            self.length
+            * (
+                4.0 / 3.0
+                - self.masspole
+                * costheta
+                * (costheta - friction_coeff)
+                / self.total_mass
+            )
+        )
 
         # The system of equations is impossible to solve with sgn function
         # But we assume that thetaacc is small enough to not flip the sign of N_c
         # If this fails it means that we haved reached outside of the model's predictive power
         # Revise the paper above if you want to fix it
-        # N_c = self.total_mass * self.gravity - self.polemass_length * (
-        #     thetaacc * sintheta + theta_dot**2 * costheta
-        # )
-        # assert N_c >= 0.0
-
-
-        # xacc = (
-        #     temp - self.polemass_length * thetaacc * costheta - N_c * friction_coeff
-        # ) / self.total_mass
-        
-        temp = (
-            force + self.polemass_length * theta_dot**2 * sintheta
-        ) / self.total_mass
-        thetaacc = (self.gravity * sintheta - costheta * temp) / (
-            self.length * (4.0 / 3.0 - self.masspole * costheta**2 / self.total_mass)
+        N_c = self.total_mass * self.gravity - self.polemass_length * (
+            thetaacc * sintheta + theta_dot**2 * costheta
         )
-        xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
+        assert N_c >= 0.0
+
+
+        xacc = (
+            temp - self.polemass_length * thetaacc * costheta - N_c * friction_coeff
+        ) / self.total_mass
 
         if self.kinematics_integrator == "euler":
             x = x + self.tau * x_dot
@@ -171,8 +161,14 @@ class CartPoleEnv(gym.Env):
                 )
             self.steps_beyond_done += 1
             reward = 0.0
+            
+        if len(self.obs_noise.shape) in {0, 1}:
+            noise = np.random.normal(0, self.obs_noise, (4,))
+        else:
+            print('Noise is should be a number or 1-dimensional array')
+            
 
-        return np.array(self.state), reward, done, {}
+        return np.array(self.state) + noise, reward, done, {}
 
     def reset(self):
         self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))
