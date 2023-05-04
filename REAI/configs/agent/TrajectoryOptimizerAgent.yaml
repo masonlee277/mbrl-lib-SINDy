@@ -1,0 +1,9 @@
+# @package _group_
+_target_: mbrl.planning.TrajectoryOptimizerAgent
+planning_horizon: 15
+replan_freq: 1
+verbose: false
+action_lb: ???
+action_ub: ???
+optimizer_cfg: ???
+

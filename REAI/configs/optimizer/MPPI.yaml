@@ -1,0 +1,10 @@
+# @package _group_
+_target_: mbrl.planning.MPPIOptimizer
+num_iterations: 5
+population_size: 350
+gamma: 0.9
+sigma: 1.0
+beta: 0.9
+lower_bound: ???
+upper_bound: ???
+device: cuda:0

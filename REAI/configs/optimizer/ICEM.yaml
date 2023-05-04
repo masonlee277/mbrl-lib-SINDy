@@ -1,0 +1,13 @@
+# @package _group_
+_target_: mbrl.planning.ICEMOptimizer
+num_iterations: 20
+elite_ratio: 0.1
+population_size: 5000
+alpha: 0.1
+device: cuda:0
+lower_bound: ???
+upper_bound: ???
+return_mean_elites: true
+keep_elite_frac: 0.1
+population_decay_factor: 2.0
+colored_noise_exponent: 2

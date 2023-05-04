@@ -26,7 +26,7 @@ def check_physics_model(replay_buffer, physics_model):
         state = torch.tensor(test_trajectory[i])
         action = torch.tensor(test_actions[i])
         
-        print(state, init_state)
+        #print(state, init_state)
         #if i == 0: assert state == init_state, print(state,init_state)
         
         #predicting recursively (from its own prediction)

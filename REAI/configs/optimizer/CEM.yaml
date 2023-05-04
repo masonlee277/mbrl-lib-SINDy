@@ -1,0 +1,11 @@
+# @package _group_
+_target_: mbrl.planning.CEMOptimizer
+num_iterations: 20
+elite_ratio: 0.1
+population_size: 1000
+alpha: 0.1
+device: cuda:0
+lower_bound: ???
+upper_bound: ???
+return_mean_elites: true
+clipped_normal: true
