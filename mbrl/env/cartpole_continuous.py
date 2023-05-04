@@ -90,7 +90,7 @@ class CartPoleEnv(gym.Env):
         ) / self.total_mass
         temp2 = (
             -temp
-            + self.polemass_length * theta_dot**2 * costheta / self.total_mass
+            - self.polemass_length * theta_dot**2 * costheta / self.total_mass
             + friction_coeff * self.gravity
         )
         thetaacc = (
@@ -102,10 +102,10 @@ class CartPoleEnv(gym.Env):
             self.length
             * (
                 4.0 / 3.0
-                - self.masspole
+                - (self.masspole
                 * costheta
                 * (costheta - friction_coeff)
-                / self.total_mass
+                / self.total_mass)
             )
         )
 
@@ -116,11 +116,11 @@ class CartPoleEnv(gym.Env):
         N_c = self.total_mass * self.gravity - self.polemass_length * (
             thetaacc * sintheta + theta_dot**2 * costheta
         )
-        assert N_c >= 0.0
+        assert np.all(N_c >= 0.0)
 
 
-        xacc = (
-            temp - self.polemass_length * thetaacc * costheta - N_c * friction_coeff
+        xacc = temp - (
+            self.polemass_length * thetaacc * costheta + N_c * friction_coeff
         ) / self.total_mass
 
         if self.kinematics_integrator == "euler":
