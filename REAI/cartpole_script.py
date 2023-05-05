@@ -27,12 +27,13 @@ import pandas as pd
 
 log = logging.getLogger(__name__)
 
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 @hydra.main(config_path="configs", config_name="main")
 def run(exp_config : DictConfig):
 
-    print(exp_config.pretty())
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+    log.info('Device : {}'.format(device))
 
     rendering  = False
     plotting = False
@@ -178,49 +179,76 @@ def run(exp_config : DictConfig):
     # Main PETS loop
     all_rewards = [0]
     for trial in range(num_trials):
-        obs = env.reset()
-        agent.reset()
 
-        done = False
-        total_reward = 0.0
-        steps_trial = 0
-        if rendering:
-            update_axes(
-                axs, env.render(mode="rgb_array"), ax_text, trial, steps_trial, all_rewards
-            )
+        try:
+            obs = env.reset()
+            agent.reset()
 
-        while not done:
-            # --------------- Model Training -----------------
-            if steps_trial == 0:
-                dynamics_model.update_normalizer(
-                    replay_buffer.get_all()
-                )  # update normalizer stats
-
-                dynamics_model.model.physics_model.inputs_normalizer = dynamics_model.input_normalizer
-
-                # bootsrapped
-                dataset_train, dataset_val = common_util.get_basic_buffer_iterators(
-                    replay_buffer,
-                    batch_size=cfg.overrides.model_batch_size,
-                    val_ratio=cfg.overrides.validation_ratio,
-                    ensemble_size=ensemble_size,
-                    shuffle_each_epoch=True,
-                    bootstrap_permutes=False,  # build bootstrap dataset using sampling with replacement
+            done = False
+            total_reward = 0.0
+            steps_trial = 0
+            if rendering:
+                update_axes(
+                    axs, env.render(mode="rgb_array"), ax_text, trial, steps_trial, all_rewards
                 )
-                if phys_nn_config != 3:
-                    model_trainer.train(
-                        dataset_train,
-                        dataset_val=dataset_val,
-                        num_epochs=150,
-                        patience=50,
-                        callback=train_callback,
-                        silent=False,
+
+            while not done:
+                # --------------- Model Training -----------------
+                if steps_trial == 0:
+                    dynamics_model.update_normalizer(
+                        replay_buffer.get_all()
+                    )  # update normalizer stats
+
+                    dynamics_model.model.physics_model.inputs_normalizer = dynamics_model.input_normalizer
+
+                    # bootsrapped
+                    dataset_train, dataset_val = common_util.get_basic_buffer_iterators(
+                        replay_buffer,
+                        batch_size=cfg.overrides.model_batch_size,
+                        val_ratio=cfg.overrides.validation_ratio,
+                        ensemble_size=ensemble_size,
+                        shuffle_each_epoch=True,
+                        bootstrap_permutes=False,  # build bootstrap dataset using sampling with replacement
+                    )
+                    if phys_nn_config != 3:
+                        model_trainer.train(
+                            dataset_train,
+                            dataset_val=dataset_val,
+                            num_epochs=150,
+                            patience=50,
+                            callback=train_callback,
+                            silent=False,
+                        )
+
+                # --- Doing env step using the agent and adding to model dataset ---
+                next_obs, reward, done, _ = common_util.step_env_and_add_to_buffer(
+                    env, obs, agent, {}, replay_buffer
+                )
+
+                if rendering:
+                    update_axes(
+                        axs,
+                        env.render(mode="rgb_array"),
+                        ax_text,
+                        trial,
+                        steps_trial,
+                        all_rewards,
+                        force_update=True,
                     )
 
-            # --- Doing env step using the agent and adding to model dataset ---
-            next_obs, reward, done, _ = common_util.step_env_and_add_to_buffer(
-                env, obs, agent, {}, replay_buffer
-            )
+                obs = next_obs
+                total_reward += reward
+                steps_trial += 1
+
+                if steps_trial == trial_length:
+                    break
+            
+            #retrain the physics model after each trial
+            if isinstance(dynamics_model.model.physics_model, SINDyModel):
+                dynamics_model.model.physics_model.train(replay_buffer)
+
+            all_rewards.append(total_reward)
+            log.info("Total reward: {}".format(total_reward))
 
             if rendering:
                 update_axes(
@@ -232,31 +260,11 @@ def run(exp_config : DictConfig):
                     all_rewards,
                     force_update=True,
                 )
-
-            obs = next_obs
-            total_reward += reward
-            steps_trial += 1
-
-            if steps_trial == trial_length:
-                break
-        
-        #retrain the physics model after each trial
-        if isinstance(dynamics_model.model.physics_model, SINDyModel):
-            dynamics_model.model.physics_model.train(replay_buffer)
-
-        all_rewards.append(total_reward)
-        log.info("Total reward: {}".format(total_reward))
-
-        if rendering:
-            update_axes(
-                axs,
-                env.render(mode="rgb_array"),
-                ax_text,
-                trial,
-                steps_trial,
-                all_rewards,
-                force_update=True,
-            )
+        except Exception as e:
+            # Log the error message to a file
+            log.info("Error in trial {}".format(trial))
+            log.error(str(e))
+            
     if plotting:
         fig, ax = plt.subplots(2, 1, figsize=(12, 10))
         ax[0].plot(train_losses)
