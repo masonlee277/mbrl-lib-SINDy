@@ -28,6 +28,6 @@ wheels/
 MANIFEST
 outputs
 multirun
-*.err
 *.out
+*.err
 *.sh
