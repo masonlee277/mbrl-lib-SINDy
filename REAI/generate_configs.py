@@ -55,6 +55,7 @@ env_cfg = {
    }
 
 with open('REAI/configs/env/cartpole.yaml', 'w') as f:
+    f.write('# @package _group_\n')
     f.write(omegaconf.OmegaConf.to_yaml(env_cfg))
 
 
@@ -120,7 +121,9 @@ agent_cfg= { "_target_": "mbrl.planning.TrajectoryOptimizerAgent",
             "replan_freq": 1,
             "verbose": False,
             "action_lb": "???",
-            "action_ub": "???",}
+            "action_ub": "???",
+            "optimizer_cfg": "???"
+}
 with open('REAI/configs/agent/TrajectoryOptimizerAgent.yaml', 'w') as f:
     f.write('# @package _group_\n')
     f.write(omegaconf.OmegaConf.to_yaml(agent_cfg))
