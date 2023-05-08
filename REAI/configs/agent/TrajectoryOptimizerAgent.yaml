@@ -5,5 +5,3 @@ replan_freq: 1
 verbose: false
 action_lb: ???
 action_ub: ???
-optimizer_cfg: ???
-

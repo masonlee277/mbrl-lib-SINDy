@@ -1,9 +1,10 @@
 seed: 0
 phys_nn_config: 3
 physics_model: sindy
+predict_delta: false
 model_kwargs:
   backend: torch
-  predict_delta: True
+  predict_delta: false
   noise_level: 0.0
 trial_length: 200
 num_trials: 10
@@ -11,5 +12,6 @@ num_particles: 20
 ensemble_size: 5
 defaults: 
  - dynamics: GaussianMLP
- - agent: TrajectoryOptimizerAgent
  - optimizer: CEM
+ - agent: TrajectoryOptimizerAgent
+ - env: cartpole

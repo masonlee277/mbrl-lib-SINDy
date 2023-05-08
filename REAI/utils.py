@@ -17,9 +17,6 @@ def check_physics_model(replay_buffer, physics_model):
     predicted_states = []
     predict_recursively = []
     init_state = deepcopy(test_trajectory[0])
-    print('init_state', init_state)
-    if physics_model.predict_delta: print('Predicting delta')
-    else: print('Predicting state')
 
     cur_state = init_state
     for i in range(len(test_trajectory)):

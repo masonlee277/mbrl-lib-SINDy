@@ -36,9 +36,26 @@ with open('REAI/configs/main.yaml', 'w') as f:
     f.write(' - dynamics: GaussianMLP\n')
     f.write(' - optimizer: CEM\n')
     f.write(' - agent: TrajectoryOptimizerAgent\n')
+    f.write(' - env: cartpole\n')
 
 
+env_cfg = {
+    'gravity': 9.8,
+    'masscart': 1.0,
+    'masspole': 0.1,
+    'length': 0.5,
+    'force_mag': 10.0,
+    'track_friction': 0.0,
+    'joint_friction': 0.0,
+    # Standard deviation on the observation of the states
+    # DOES NOT AFFECT INTERNAL STATE PROPOGATION 
+    # can be scalar or 1-d array
+    # 'obs_noise': [0.003, 0.01, 0.003, 0.01], 
+    'obs_noise': 0.0, 
+   }
 
+with open('REAI/configs/env/cartpole.yaml', 'w') as f:
+    f.write(omegaconf.OmegaConf.to_yaml(env_cfg))
 
 
 optimizer_config = {

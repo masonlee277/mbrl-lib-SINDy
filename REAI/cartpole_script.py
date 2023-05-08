@@ -60,12 +60,28 @@ def run(exp_config : DictConfig):
             "validation_ratio": 0.05,
         },
     }
+    env_cfg = exp_config['env']#.to_container()
+
+    #     env_cfg = {
+    #     'gravity': 9.8,
+    #     'masscart': 1.0,
+    #     'masspole': 0.1,
+    #     'length': 0.5,
+    #     'force_mag': 10.0,
+    #     'track_friction': 0.0,
+    #     'joint_friction': 0.0,
+    #     # Standard deviation on the observation of the states
+    #     # DOES NOT AFFECT INTERNAL STATE PROPOGATION 
+    #     # can be scalar or 1-d array
+    #     # 'obs_noise': [0.003, 0.01, 0.003, 0.01], 
+    #     'obs_noise': 0.0, 
+    #    }
 
     #agent_cfg["optimizer_cfg"] =  exp_config['optimizer'].to_container()
     OmegaConf.update(exp_config['agent'], 'optimizer_cfg', exp_config['optimizer'])
     agent_cfg = omegaconf.OmegaConf.create(exp_config['agent'])
 
-    env = cartpole_env.CartPoleEnv()
+    env = cartpole_env.CartPoleEnv(**env_cfg)
     env.seed(seed)
     rng = np.random.default_rng(seed=0)
     generator = torch.Generator(device=device)
