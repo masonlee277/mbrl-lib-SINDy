@@ -7,6 +7,7 @@ import torch
 import omegaconf
 
 import mbrl.env.cartpole_continuous as cartpole_env
+import mbrl.env.pets_halfcheetah as halfcheetah_env
 import mbrl.env.reward_fns as reward_fns
 import mbrl.env.termination_fns as termination_fns
 
@@ -61,6 +62,7 @@ def run(exp_config : DictConfig):
         },
     }
     env_cfg = exp_config['env']#.to_container()
+    environment = exp_config['name']
 
     #     env_cfg = {
     #     'gravity': 9.8,
@@ -81,7 +83,15 @@ def run(exp_config : DictConfig):
     OmegaConf.update(exp_config['agent'], 'optimizer_cfg', exp_config['optimizer'])
     agent_cfg = omegaconf.OmegaConf.create(exp_config['agent'])
 
-    env = cartpole_env.CartPoleEnv(**env_cfg)
+    #def run():
+    if environment == 'cartpole':
+        env = cartpole_env.CartPoleEnv(**env_cfg)
+        reward_fn = reward_fns.cartpole
+        term_fn   = termination_fns.cartpole
+    elif environment == 'halfcheetah':
+        env = halfcheetah_env.HalfCheetahEnv()
+        reward_fn = reward_fns.halfcheetah
+        term_fn   = termination_fns.no_termination
     env.seed(seed)
     rng = np.random.default_rng(seed=0)
     generator = torch.Generator(device=device)
@@ -89,10 +99,10 @@ def run(exp_config : DictConfig):
     obs_shape = env.observation_space.shape
     act_shape = env.action_space.shape
 
-    # This functions allows the model to evaluate the true rewards given an observation
-    reward_fn = reward_fns.cartpole
-    # This function allows the model to know if an observation should make the episode end
-    term_fn = termination_fns.cartpole
+    # # This functions allows the model to evaluate the true rewards given an observation
+    # reward_fn = reward_fns.cartpole
+    # # This function allows the model to know if an observation should make the episode end
+    # term_fn = termination_fns.cartpole
 
 
     phys_nn_config = exp_config['phys_nn_config']
@@ -121,7 +131,8 @@ def run(exp_config : DictConfig):
     elif physics_model == 'cartpole':
         dynamics_model.model.physics_model = CartpoleModel(**exp_config['model_kwargs'])
 
-
+    dynamics_model.model.obs_dim = obs_shape[0]
+    dynamics_model.model.act_dim = act_shape[0]
 
     # Create a gym-like environment to encapsulate the model
     model_env = models.ModelEnv(
@@ -139,9 +150,11 @@ def run(exp_config : DictConfig):
         trial_length=trial_length,
     )
 
-    # pretrain Sindy model on random trajectories
-    if isinstance(dynamics_model.model.physics_model, SINDyModel):
-        dynamics_model.model.physics_model.train(replay_buffer)
+
+    if phys_nn_config!=0:
+        # pretrain Sindy model on random trajectories
+        if isinstance(dynamics_model.model.physics_model, SINDyModel):
+            dynamics_model.model.physics_model.train(replay_buffer)
 
 
 
