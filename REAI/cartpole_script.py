@@ -7,6 +7,7 @@ import torch
 import omegaconf
 
 import mbrl.env.cartpole_continuous as cartpole_env
+import mbrl.env.pets_halfcheetah as halfcheetah_env
 import mbrl.env.reward_fns as reward_fns
 import mbrl.env.termination_fns as termination_fns
 
@@ -18,21 +19,21 @@ import mbrl.util as util
 
 from REAI.physics_models import SINDyModel, CartpoleModel
 from REAI.physics_models import trajectories_from_replay_buffer
-from utils import check_physics_model
+from REAI.utils import check_physics_model
 
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-
-trial_length = 200
+environment = 'halfcheetah' # 'halfcheetah' or 'cartpole'
+trial_length = 10
 num_trials = 10
 ensemble_size = 1
-num_particles = 20
-rendering = True
+num_particles = 1
+rendering = False
 seed = 0
 
 physics_config = {
-    'phys_nn_config' : 1,                   
+    'phys_nn_config' : 2,                   
         # options:  
         # 0: no physics model, only pets
         # 1: additive composition: 
@@ -43,7 +44,7 @@ physics_config = {
     'physics_model' : 'sindy',               
         # options: sindy/cartpole
     
-    'model_kwargs' : { #'backend' : 'torch',
+    'model_kwargs' : { 'backend' : 'sindy',
                        'noise_level' : 0.0 , 
                        'predict_delta' : True
                        } ,
@@ -124,7 +125,7 @@ agent_cfg = omegaconf.OmegaConf.create(
             "_target_": "mbrl.planning.ICEMOptimizer",
             "num_iterations": 20,
             "elite_ratio": 0.1,
-            "population_size": 5000,
+            "population_size": 10,
             "alpha": 0.1,
             "device": device,
             "lower_bound": "???",
@@ -150,7 +151,14 @@ agent_cfg = omegaconf.OmegaConf.create(
 
 
 #def run():
-env = cartpole_env.CartPoleEnv()
+if environment == 'cartpole':
+    env = cartpole_env.CartPoleEnv()
+    reward_fn = reward_fns.cartpole
+    term_fn   = termination_fns.cartpole
+elif environment == 'halfcheetah':
+    env = halfcheetah_env.HalfCheetahEnv()
+    reward_fn = reward_fns.halfcheetah
+    term_fn   = termination_fns.no_termination
 env.seed(seed)
 rng = np.random.default_rng(seed=0)
 generator = torch.Generator(device=device)
@@ -158,10 +166,10 @@ generator.manual_seed(seed)
 obs_shape = env.observation_space.shape
 act_shape = env.action_space.shape
 
-# This functions allows the model to evaluate the true rewards given an observation
-reward_fn = reward_fns.cartpole
-# This function allows the model to know if an observation should make the episode end
-term_fn = termination_fns.cartpole
+# # This functions allows the model to evaluate the true rewards given an observation
+# reward_fn = reward_fns.cartpole
+# # This function allows the model to know if an observation should make the episode end
+# term_fn = termination_fns.cartpole
 
 
 phys_nn_config = physics_config['phys_nn_config']
@@ -190,7 +198,8 @@ if physics_model == 'sindy':
 elif physics_model == 'cartpole':
     dynamics_model.model.physics_model = CartpoleModel(**physics_config['model_kwargs'])
 
-
+dynamics_model.model.obs_dim = obs_shape[0]
+dynamics_model.model.act_dim = act_shape[0]
 
 # Create a gym-like environment to encapsulate the model
 model_env = models.ModelEnv(
@@ -208,14 +217,14 @@ common_util.rollout_agent_trajectories(
     trial_length=trial_length,
 )
 
-# pretrain Sindy model on random trajectories
-if isinstance(dynamics_model.model.physics_model, SINDyModel):
-    dynamics_model.model.physics_model.train(replay_buffer)
 
+if phys_nn_config!=0:
+    # pretrain Sindy model on random trajectories
+    if isinstance(dynamics_model.model.physics_model, SINDyModel):
+        dynamics_model.model.physics_model.train(replay_buffer)
 
-
-#check physics model
-check_physics_model(replay_buffer, dynamics_model.model.physics_model)
+    #check physics model
+    check_physics_model(replay_buffer, dynamics_model.model.physics_model)
 print("num stored", replay_buffer.num_stored)
 print("# samples stored", replay_buffer.num_stored)
 

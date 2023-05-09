@@ -92,6 +92,8 @@ class GaussianMLP(Ensemble):
         )
         self.physics_model = None
         self.phys_nn_config = None
+        self.obs_dim = None
+        self.act_dim   = None
         self.in_size = in_size
         self.out_size = out_size
 
@@ -216,7 +218,12 @@ class GaussianMLP(Ensemble):
                 
 
             x_unnormalized = x * std_n + mean_n
-            state, action = x_unnormalized[...,:-1], x_unnormalized[...,-1]
+            state, action = x_unnormalized[...,:self.obs_dim], x_unnormalized[...,-self.act_dim:]
+            # print("Shape of x", x.shape)
+            # print("Shape of mean ", mean_n.shape)
+            # print("Shape of state ",state.shape)
+            # print("Shape of action ",action.shape)
+            
             
 
         
@@ -254,7 +261,7 @@ class GaussianMLP(Ensemble):
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
             #state, action = x[...,:-1], x[...,-1]
             mean_phys = self.physics_model.predict(state, action) + state
-            mean_phys_normalized = (mean_phys - mean_n[..., :-1]) / std_n[..., :-1]
+            mean_phys_normalized = (mean_phys - mean_n[..., :self.obs_dim]) / std_n[..., :self.obs_dim]
             mean_phys  = mean_phys_normalized
             #pass prediction through NN
             xin = torch.cat((mean_phys, x), dim=-1)        

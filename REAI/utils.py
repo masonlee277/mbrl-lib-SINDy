@@ -5,20 +5,22 @@ from REAI.physics_models import trajectories_from_replay_buffer
 from copy import deepcopy
 
 #check physics model
+#check physics model
 def check_physics_model(replay_buffer, physics_model):
     '''
     physics_model = dynamics_model.model.physics_model
     '''
 
     trajectories_list, action_list  = trajectories_from_replay_buffer(replay_buffer)
-    test_trajectory = trajectories_list[1]
-    test_actions = action_list[1]
+    test_trajectory = trajectories_list[0]
+    test_actions = action_list[0]
 
     predicted_states = []
     predict_recursively = []
     init_state = deepcopy(test_trajectory[0])
 
     cur_state = init_state
+    #for i in range(len(test_trajectory)):
     for i in range(len(test_trajectory)):
         state = torch.tensor(test_trajectory[i])
         action = torch.tensor(test_actions[i])
@@ -41,7 +43,7 @@ def check_physics_model(replay_buffer, physics_model):
     predicted_states = np.array(predicted_states)
     predict_recursively = np.array(predict_recursively)
 
-    plt.figure()
+    plt.figure(figsize=(10,15))
     state_dims = state.shape[0]
     for j in range(state_dims):
         plt.subplot(state_dims, 2, 2*j + 1)
@@ -57,6 +59,8 @@ def check_physics_model(replay_buffer, physics_model):
         #plt.plot( np.abs(predicted_states_own[:-1, j]- test_trajectory[1:, j]) ,  label='model prediction recursive')        
         plt.title('Errors')
     plt.show()
+
+
 
     
 
