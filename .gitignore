@@ -31,3 +31,4 @@ multirun
 *.out
 *.err
 *.sh
+*.DS_Store
