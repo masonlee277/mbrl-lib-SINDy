@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 from REAI.physics_models import trajectories_from_replay_buffer
 from copy import deepcopy
 
+
+import mbrl.planning as planning
+import mbrl.util.common as common_util
 #check physics model
 #check physics model
 def check_physics_model(replay_buffer, physics_model):
@@ -101,7 +104,7 @@ def create_fake_replay_buffer(
     temp_next_obs = []
 
     for init_s in total_states:
-        actions = [random.uniform(lower_bound, upper_bound) for x in range(num_actions)]
+        actions = [np.random.uniform(lower_bound, upper_bound) for x in range(num_actions)]
         actions = np.squeeze(actions)
         sim_trajectory = dynamics_model.model.physics_model.simulate(init_s, actions, num_steps)
 
