@@ -185,6 +185,9 @@ class SINDyModel():
         self.noise_level = noise_level
         self.predict_delta = predict_delta
         self.inputs_normalizer = None
+        
+        self.obs_dim = None
+        self.act_dim = None
 
     def extract_data_from_buffer(self, replay_buffer_test):
         d = replay_buffer_test.get_all()
@@ -215,20 +218,21 @@ class SINDyModel():
 
     def equations_to_pytorch(self):
         equations = self.model.equations()
-        
-        x_dim = len(equations) #since there is 1 equation per variable
+
         num_functions = len(self.functions)
         torch_equations = []
         for eq_string in equations:
             #replacing xs
-            for i in range(x_dim):
+            for i in range(self.obs_dim):
                 eq_string = eq_string.replace(f'x{i}[k]', f'x[:, {i}]')
+                
+            for i in range(self.act_dim):
+                eq_string = eq_string.replace(f'u{i}[k]', f'u[:, {i}]')
 
             #replacing functions
             for i in range(num_functions):
                 eq_string = eq_string.replace(f'f{i}', f'* self.torch_functions[{i}]')
 
-            eq_string = eq_string.replace(f'u0[k]', f'u[:, 0]')
             torch_equations.append(eq_string)
         
         return torch_equations
@@ -242,6 +246,10 @@ class SINDyModel():
                               optimizer=self.optimizer)
 
         trajectories_list, action_list = self.extract_data_from_buffer(replay_buffer)
+        
+        self.obs_dim = trajectories_list[0].shape[-1]
+        self.act_dim = trajectories_list[0].shape[-1]
+        
         if num_trails is not None: 
             trajectories_list = trajectories_list[:num_trails]
             action_list = action_list[:num_trails]# this is for measuring sindy lengths
@@ -269,9 +277,7 @@ class SINDyModel():
         if self.torch_equations is None:
             print('Converting equations to torch functions')
             self.torch_equations = self.equations_to_pytorch()
-        x = state
-
-        u = action.unsqueeze(-1)
+        x, u = state, action
 
         if len(x.shape) == 1:
             x = x.unsqueeze(0)

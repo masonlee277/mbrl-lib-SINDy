@@ -24,8 +24,8 @@ from REAI.utils import check_physics_model
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-environment = 'cartpole' # 'halfcheetah' or 'cartpole'
-trial_length = 200
+environment = 'halfcheetah' # 'halfcheetah' or 'cartpole'
+trial_length = 10
 num_trials = 10
 ensemble_size = 1
 num_particles = 1
