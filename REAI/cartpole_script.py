@@ -24,16 +24,16 @@ from REAI.utils import check_physics_model
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-environment = 'halfcheetah' # 'halfcheetah' or 'cartpole'
-trial_length = 10
+environment = 'cartpole' # 'halfcheetah' or 'cartpole'
+trial_length = 200
 num_trials = 10
 ensemble_size = 1
 num_particles = 1
 rendering = False
-seed = 0
+seed = 1
 
 physics_config = {
-    'phys_nn_config' : 2,                   
+    'phys_nn_config' : 1,                   
         # options:  
         # 0: no physics model, only pets
         # 1: additive composition: 
@@ -41,10 +41,10 @@ physics_config = {
         # 2: physics model prediction pass through pets
         #   mean, logvar = NN(concat(physics_model.predict(state, action), state, action)
         #3: only physics model, no NN
-    'physics_model' : 'cartpole',
+    'physics_model' : 'sindy',
         # options: sindy/cartpole
     
-    'model_kwargs' : { 'backend' : 'sindy',
+    'model_kwargs' : { 'backend' : 'torch',
                        'noise_level' : 0.0 , 
                        'predict_delta' : True
                        } ,
@@ -79,6 +79,7 @@ cfg_dict = {
         "propagation_method": "fixed_model",
         # can also configure activation function for GaussianMLP
         "activation_fn_cfg": {"_target_": "torch.nn.LeakyReLU", "negative_slope": 0.01},
+        "clamp_state_stds": 5.0
     },
     # options for training the dynamics model
     "algorithm": {
@@ -240,7 +241,7 @@ if phys_nn_config!=0:
         dynamics_model.model.physics_model.train(replay_buffer)
 
     #check physics model
-    check_physics_model(replay_buffer, dynamics_model.model.physics_model)
+    # check_physics_model(replay_buffer, dynamics_model.model.physics_model)
 print("num stored", replay_buffer.num_stored)
 print("# samples stored", replay_buffer.num_stored)
 
