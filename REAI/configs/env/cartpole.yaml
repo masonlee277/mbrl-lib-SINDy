@@ -1,4 +1,5 @@
 # @package _group_
+name : 'cartpole'
 gravity: 9.8
 masscart: 1.0
 masspole: 0.1
