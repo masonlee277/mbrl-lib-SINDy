@@ -10,6 +10,7 @@ trial_length: 200
 num_trials: 10
 num_particles: 20
 ensemble_size: 5
+pretrain_trial_length: 200
 defaults: 
  - dynamics: GaussianMLP
  - optimizer: CEM

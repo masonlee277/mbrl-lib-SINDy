@@ -1,8 +1,8 @@
 # @package _group_
 _target_: mbrl.planning.ICEMOptimizer
-num_iterations: 20
+num_iterations: 10
 elite_ratio: 0.1
-population_size: 5000
+population_size: 200
 alpha: 0.1
 device: cuda:0
 lower_bound: ???
