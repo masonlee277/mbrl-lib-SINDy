@@ -21,7 +21,8 @@ class CartPoleEnv(gym.Env):
         force_mag=10.0,
         track_friction=0.0,
         joint_friction=0.0,
-        obs_noise=0.0
+        obs_noise=0.0, 
+        **kwgs
     ):
         self.gravity = gravity
         self.masscart = masscart

@@ -138,30 +138,30 @@ def run(exp_config : DictConfig):
     )
 
     # pretrain Sindy model on random trajectories
-    if phys_nn_config!=0:
+    #if phys_nn_config!=0:
 
-        if isinstance(dynamics_model.model.physics_model, SINDyModel):
+    if isinstance(dynamics_model.model.physics_model, SINDyModel):
 
-            pretrain_replay_buffer = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=rng)        
-            
-            if 'pretrain_trial_length' in exp_config.keys():
-                pretrain_trial_length = exp_config['pretrain_trial_length']
-            else:
-                pretrain_trial_length = trial_length
+        pretrain_replay_buffer = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=rng)        
+        
+        if 'pretrain_trial_length' in exp_config.keys():
+            pretrain_trial_length = exp_config['pretrain_trial_length']
+        else:
+            pretrain_trial_length = trial_length
 
-            common_util.rollout_agent_trajectories(
-                env,
-                pretrain_trial_length,  # initial exploration steps
-                planning.RandomAgent(env),
-                {},  # keyword arguments to pass to agent.act()
-                replay_buffer=pretrain_replay_buffer,
-                trial_length=pretrain_trial_length)
-            
-            log.info('Pretrain trial steps: {}'.format(pretrain_trial_length))
-            log.info("num stored on the pretrain buffer: {}".format(pretrain_replay_buffer.num_stored))
-            dynamics_model.model.physics_model.train(pretrain_replay_buffer)
-            
-            del pretrain_replay_buffer
+        common_util.rollout_agent_trajectories(
+            env,
+            pretrain_trial_length,  # initial exploration steps
+            planning.RandomAgent(env),
+            {},  # keyword arguments to pass to agent.act()
+            replay_buffer=pretrain_replay_buffer,
+            trial_length=pretrain_trial_length)
+        
+        log.info('Pretrain trial steps: {}'.format(pretrain_trial_length))
+        log.info("num stored on the pretrain buffer: {}".format(pretrain_replay_buffer.num_stored))
+        dynamics_model.model.physics_model.train(pretrain_replay_buffer)
+        
+        del pretrain_replay_buffer
 
     replay_buffer = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=rng)
 
@@ -175,10 +175,10 @@ def run(exp_config : DictConfig):
     )
 
 
-    if phys_nn_config!=0:
-        # pretrain Sindy model on random trajectories
-        if isinstance(dynamics_model.model.physics_model, SINDyModel):
-            dynamics_model.model.physics_model.train(replay_buffer)
+    #if phys_nn_config!=0:
+    # pretrain Sindy model on random trajectories
+    # if isinstance(dynamics_model.model.physics_model, SINDyModel):
+    #     dynamics_model.model.physics_model.train(replay_buffer)
 
     #####################################################
     # Initialize a Replay Buffer of Larger Size for Evaluation:
@@ -203,18 +203,20 @@ def run(exp_config : DictConfig):
         shuffle_each_epoch=True,
         bootstrap_permutes=False,  # build bootstrap dataset using sampling with replacement
     )
+    # Create a trainer for the model
+    model_trainer = models.ModelTrainer(dynamics_model, optim_lr=1e-3, weight_decay=5e-5)
 
     ########################################################################################
     # PRETRAINING THE PETS MODEL WITH SYNTHETIC FAKE DATA:
     if exp_config['synthetic_train'] and phys_nn_config != 3:
-        print('synthetic training')
+        log.info('synthetic training')
         replay_buffer_fake = create_fake_replay_buffer(
             cfg, 
             obs_shape, 
             act_shape, 
             rng, 
             env, 
-            dynamics_model
+            dynamics_model 
         )
 
         dynamics_model.update_normalizer(
@@ -290,8 +292,6 @@ def run(exp_config : DictConfig):
         display.clear_output(wait=True)
 
 
-    # Create a trainer for the model
-    model_trainer = models.ModelTrainer(dynamics_model, optim_lr=1e-3, weight_decay=5e-5)
 
     # Create visualization objects
     if plotting:
