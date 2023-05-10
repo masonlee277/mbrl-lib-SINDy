@@ -63,6 +63,81 @@ def check_physics_model(replay_buffer, physics_model):
         plt.title('Errors')
     plt.show()
 
+def create_fake_replay_buffer(
+    cfg, 
+    obs_shape, 
+    act_shape, 
+    rng, 
+    env, 
+    dynamics_model, 
+    num_samples=7000,
+    num_actions=10,
+    num_steps=8,
+    input_mean=0.0,
+    input_stddev=0.001,
+    output_mean=0.0,
+    output_stddev=0.001
+):
+    replay_buffer_fake = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=rng)
+    common_util.rollout_agent_trajectories(
+            env,
+            num_samples,  # initial exploration steps
+            planning.RandomAgent(env),
+            {},  # keyword arguments to pass to agent.act()
+            replay_buffer=replay_buffer_fake,
+            trial_length=num_samples,
+        )
+
+    trajectories_list, action_list = dynamics_model.model.physics_model.extract_data_from_buffer(replay_buffer_fake)
+    total_states = np.concatenate(trajectories_list)
+
+    action_space = env.action_space
+    lower_bound = action_space.low
+    upper_bound = action_space.high
+
+    # Create temporary lists to store trajectories and actions
+    temp_obs = []
+    temp_action = []
+    temp_next_obs = []
+
+    for init_s in total_states:
+        actions = [random.uniform(lower_bound, upper_bound) for x in range(num_actions)]
+        actions = np.squeeze(actions)
+        sim_trajectory = dynamics_model.model.physics_model.simulate(init_s, actions, num_steps)
+
+        for i in range(len(sim_trajectory) - 1):
+            cur_state = sim_trajectory[i]
+            next_state = sim_trajectory[i + 1]
+
+            cur_action = actions[i]
+
+            # Add noise to the input state
+            cur_state_noisy = cur_state + np.random.normal(loc=input_mean, scale=input_stddev, size=cur_state.shape)
+            cur_state_noisy = np.clip(cur_state_noisy, lower_bound, upper_bound)
+            temp_obs.append(cur_state_noisy)
+
+            # Add noise to the output state
+            next_state_noisy = next_state + np.random.normal(loc=output_mean, scale=output_stddev, size=next_state.shape)
+            next_state_noisy = np.clip(next_state_noisy, lower_bound, upper_bound)
+            temp_next_obs.append(next_state_noisy)
+
+            temp_action.append(cur_action)
+
+    # Set the actual replay buffer to the temporary lists
+    temp_obs = np.array(temp_obs)
+    temp_action = np.array(temp_action)
+    temp_next_obs = np.array(temp_next_obs)
+
+    # Expand dimensions of temp_action to match the shape of replay_buffer_fake.action
+    temp_action = np.expand_dims(temp_action, axis=1)
+
+    # Set the first values in replay_buffer_fake to the values in the respective temp lists
+    replay_buffer_fake.obs[:replay_buffer_fake.num_stored] = temp_obs[:replay_buffer_fake.num_stored]
+    replay_buffer_fake.action[:replay_buffer_fake.num_stored] = temp_action[:replay_buffer_fake.num_stored]
+    replay_buffer_fake.next_obs[:replay_buffer_fake.num_stored] = temp_next_obs[:replay_buffer_fake.num_stored]
+
+    return replay_buffer_fake
+
 
 
     
