@@ -7,7 +7,7 @@ import torch
 import omegaconf
 
 import mbrl.env.cartpole_continuous as cartpole_env
-import mbrl.env.pets_halfcheetah as halfcheetah_env
+#import mbrl.env.pets_halfcheetah as halfcheetah_env
 import mbrl.env.reward_fns as reward_fns
 import mbrl.env.termination_fns as termination_fns
 
@@ -62,8 +62,7 @@ def run(exp_config : DictConfig):
         },
     }
     env_cfg = exp_config['env']#.to_container()
-    environment = exp_config['name']
-
+    environment = env_cfg['name']
     #     env_cfg = {
     #     'gravity': 9.8,
     #     'masscart': 1.0,
