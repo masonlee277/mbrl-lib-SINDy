@@ -128,6 +128,30 @@ def run(exp_config : DictConfig):
         env, dynamics_model, term_fn, reward_fn, generator=generator
     )
 
+    # pretrain Sindy model on random trajectories
+    if isinstance(dynamics_model.model.physics_model, SINDyModel):
+
+        pretrain_replay_buffer = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=rng)        
+        
+        if 'pretrain_trial_length' in exp_config.keys():
+            pretrain_trial_length = exp_config['pretrain_trial_length']
+        else:
+            pretrain_trial_length = trial_length
+
+        common_util.rollout_agent_trajectories(
+            env,
+            pretrain_trial_length,  # initial exploration steps
+            planning.RandomAgent(env),
+            {},  # keyword arguments to pass to agent.act()
+            replay_buffer=pretrain_replay_buffer,
+            trial_length=pretrain_trial_length)
+        
+        log.info('Pretrain trial steps: {}'.format(pretrain_trial_length))
+        log.info("num stored on the pretrain buffer: {}".format(pretrain_replay_buffer.num_stored))
+        dynamics_model.model.physics_model.train(pretrain_replay_buffer)
+        
+        del pretrain_replay_buffer
+
     replay_buffer = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=rng)
 
     common_util.rollout_agent_trajectories(
@@ -139,9 +163,6 @@ def run(exp_config : DictConfig):
         trial_length=trial_length,
     )
 
-    # pretrain Sindy model on random trajectories
-    if isinstance(dynamics_model.model.physics_model, SINDyModel):
-        dynamics_model.model.physics_model.train(replay_buffer)
 
 
 
