@@ -84,6 +84,7 @@ class GaussianMLP(Ensemble):
         learn_logvar_bounds: bool = False,
         activation_fn_cfg: Optional[Union[Dict, omegaconf.DictConfig]] = None,
         in_features: Optional[int] = None,
+        clamp_state_stds: Optional[int] = None,
         #physics_dim: (for SINDy model)
         #SINDy model: 
     ):
@@ -97,6 +98,8 @@ class GaussianMLP(Ensemble):
         self.in_size = in_size
         self.out_size = out_size
 
+        self.clamp_state_stds = clamp_state_stds
+            
         if in_features is None:
             in_features = in_size
         self.in_features = in_features
@@ -243,9 +246,16 @@ class GaussianMLP(Ensemble):
         elif self.phys_nn_config ==1: # add means
             assert self.physics_model is not None, "physics model has to be defined for this phys_nn_config"
 
+            if self.clamp_state_stds is None:
+                mean_phys = self.physics_model.predict(state, action)
+            else:
+                mean_phys = torch.clamp(self.physics_model.predict(state, action) + state, 
+                                        min=mean_n[..., :self.obs_dim] - self.clamp_state_stds * std_n[..., :self.obs_dim], 
+                                        max=mean_n[..., :self.obs_dim] + self.clamp_state_stds * std_n[..., :self.obs_dim]) - state
+
             # phys model
             #state, action = x[...,:-1], x[...,-1]
-            mean_phys = self.physics_model.predict(state, action)
+            #mean_phys = self.physics_model.predict(state, action)
             #mean_phys_normalized = (mean_phys - mean_n[..., :-1]) / std_n[..., :-1]
             #mean_phys  = mean_phys_normalized
             # NN 

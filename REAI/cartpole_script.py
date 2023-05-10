@@ -7,7 +7,7 @@ import torch
 import omegaconf
 
 import mbrl.env.cartpole_continuous as cartpole_env
-import mbrl.env.pets_halfcheetah as halfcheetah_env
+#import mbrl.env.pets_halfcheetah as halfcheetah_env
 import mbrl.env.reward_fns as reward_fns
 import mbrl.env.termination_fns as termination_fns
 
@@ -20,6 +20,7 @@ import mbrl.util as util
 from REAI.physics_models import SINDyModel, CartpoleModel
 from REAI.physics_models import trajectories_from_replay_buffer
 from REAI.utils import check_physics_model
+from REAI.utils import create_fake_replay_buffer
 
 import logging
 from omegaconf import DictConfig, OmegaConf
@@ -62,8 +63,7 @@ def run(exp_config : DictConfig):
         },
     }
     env_cfg = exp_config['env']#.to_container()
-    environment = exp_config['name']
-
+    environment = env_cfg['name']
     #     env_cfg = {
     #     'gravity': 9.8,
     #     'masscart': 1.0,
@@ -108,8 +108,6 @@ def run(exp_config : DictConfig):
     phys_nn_config = exp_config['phys_nn_config']
     physics_model = exp_config['physics_model']
 
-
-
     if phys_nn_config == 2:
         cfg_dict["dynamics_model"]["in_features"] = 2 * obs_shape[0] + (act_shape[0] if act_shape else 1)
         log.info('overriding in_features to {}'.format(cfg_dict["dynamics_model"]["in_features"]))
@@ -139,6 +137,32 @@ def run(exp_config : DictConfig):
         env, dynamics_model, term_fn, reward_fn, generator=generator
     )
 
+    # pretrain Sindy model on random trajectories
+    if phys_nn_config!=0:
+
+        if isinstance(dynamics_model.model.physics_model, SINDyModel):
+
+            pretrain_replay_buffer = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=rng)        
+            
+            if 'pretrain_trial_length' in exp_config.keys():
+                pretrain_trial_length = exp_config['pretrain_trial_length']
+            else:
+                pretrain_trial_length = trial_length
+
+            common_util.rollout_agent_trajectories(
+                env,
+                pretrain_trial_length,  # initial exploration steps
+                planning.RandomAgent(env),
+                {},  # keyword arguments to pass to agent.act()
+                replay_buffer=pretrain_replay_buffer,
+                trial_length=pretrain_trial_length)
+            
+            log.info('Pretrain trial steps: {}'.format(pretrain_trial_length))
+            log.info("num stored on the pretrain buffer: {}".format(pretrain_replay_buffer.num_stored))
+            dynamics_model.model.physics_model.train(pretrain_replay_buffer)
+            
+            del pretrain_replay_buffer
+
     replay_buffer = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=rng)
 
     common_util.rollout_agent_trajectories(
@@ -156,7 +180,76 @@ def run(exp_config : DictConfig):
         if isinstance(dynamics_model.model.physics_model, SINDyModel):
             dynamics_model.model.physics_model.train(replay_buffer)
 
+    #####################################################
+    # Initialize a Replay Buffer of Larger Size for Evaluation:
+    replay_buffer_test = common_util.create_replay_buffer(cfg, obs_shape, act_shape, rng=rng)
 
+
+    common_util.rollout_agent_trajectories(
+        env,
+        1000,  # initial exploration steps
+        planning.RandomAgent(env),
+        {},  # keyword arguments to pass to agent.act()
+        replay_buffer=replay_buffer_test,
+        trial_length=1000,
+    )
+
+
+    test_replay_buffer_dataset, dataset_val = common_util.get_basic_buffer_iterators(
+        replay_buffer_test,
+        batch_size=cfg.overrides.model_batch_size,
+        val_ratio=cfg.overrides.validation_ratio,
+        ensemble_size=ensemble_size,
+        shuffle_each_epoch=True,
+        bootstrap_permutes=False,  # build bootstrap dataset using sampling with replacement
+    )
+
+    ########################################################################################
+    # PRETRAINING THE PETS MODEL WITH SYNTHETIC FAKE DATA:
+    if exp_config['synthetic_train'] and phys_nn_config != 3:
+        print('synthetic training')
+        replay_buffer_fake = create_fake_replay_buffer(
+            cfg, 
+            obs_shape, 
+            act_shape, 
+            rng, 
+            env, 
+            dynamics_model
+        )
+
+        dynamics_model.update_normalizer(
+                replay_buffer_fake.get_all()
+            )  # update normalizer stats
+
+        train_losses_synthetic = []
+        val_scores_synthetic = []
+        def train_callback(_model, _total_calls, _epoch, tr_loss, val_score, _best_val):
+            train_losses_synthetic.append(tr_loss)
+            val_scores_synthetic.append(
+                val_score.mean().item()
+            )  # this returns val score per ensemble model
+
+        dynamics_model.model.physics_model.inputs_normalizer = dynamics_model.input_normalizer
+        dataset_train, dataset_val = common_util.get_basic_buffer_iterators(
+            replay_buffer_fake,
+            batch_size=cfg.overrides.model_batch_size,
+            val_ratio=cfg.overrides.validation_ratio,
+            ensemble_size=ensemble_size,
+            shuffle_each_epoch=True,
+            bootstrap_permutes=False,  # build bootstrap dataset using sampling with replacement
+        )
+        if phys_nn_config != 3:
+            model_trainer.train(
+                dataset_train,
+                dataset_val=test_replay_buffer_dataset,
+                num_epochs=15,
+                patience=50,
+                callback=train_callback,
+                silent=False,
+            )
+
+
+    ########################################################################################
 
     #check physics model
     #check_physics_model(replay_buffer, dynamics_model.model.physics_model)

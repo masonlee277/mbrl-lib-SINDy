@@ -1,7 +1,7 @@
 # @package _group_
 _target_: mbrl.planning.MPPIOptimizer
-num_iterations: 5
-population_size: 350
+num_iterations: 10
+population_size: 200
 gamma: 0.9
 sigma: 1.0
 beta: 0.9
